@@ -36,6 +36,7 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         sudo apt-get build-dep -y python-psycopg2 python-imaging
         sudo pip install fabric
         cd /vagrant
+        wget -q https://raw.githubusercontent.com/vitaly4uk/vps-tools/master/fabfile.py
         fab clone_project_template
       SHELL
     s.privileged = false
@@ -84,7 +85,7 @@ def start_heroku_project():
 
 def clone_project_template():
     with lcd('/home/vagrant'):
-        local('wget https://github.com/vitaly4uk/django-heroku-project-template/archive/master.zip')
+        local('wget -q https://github.com/vitaly4uk/django-heroku-project-template/archive/master.zip')
         local('unzip ./master.zip')
         local('cp -R /home/vagrant/django-heroku-project-template-master/* /vagrant/')
 
