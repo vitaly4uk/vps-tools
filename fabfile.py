@@ -1,9 +1,9 @@
 from __future__ import unicode_literals, print_function
-from fabric.api import local, abort, settings
+from fabric.api import local, abort, settings, lcd
 from fabric.contrib.console import prompt
 
 
-__all__ = ['start_heroku_project', 'hello_world']
+__all__ = ['start_heroku_project', 'version', 'clone_project_template']
 
 vagrant_file_content = """Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/trusty64"
@@ -36,7 +36,7 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         sudo apt-get build-dep -y python-psycopg2 python-imaging
         sudo pip install fabric
         cd /vagrant
-        fab hello_world
+        fab clone_project_template
       SHELL
     s.privileged = false
   end
@@ -63,16 +63,34 @@ def check_heroku():
     print('Heroku have been installed correct.\n')
 
 
+def check_vagrant():
+    with settings(warn_only=True):
+        response = local('vagrant version')
+    if response.failed:
+        abort('You have to install vagrant first. Please, visit https://www.vagrantup.com/')
+
+
 def start_heroku_project():
     """
     Start new heroku project from scratch.
     """
     check_heroku()
+    check_vagrant()
     set_runtime()
     with open('Vagrantfile', 'w') as f:
         f.write(vagrant_file_content)
     local('vagrant up')
 
 
-def hello_world():
-    print('Hello, world!')
+def clone_project_template():
+    with lcd('/home/vagrant'):
+        local('wget https://github.com/vitaly4uk/django-heroku-project-template/archive/master.zip')
+        local('unzip ./master.zip')
+        local('cp -R /home/vagrant/django-heroku-project-template-master/* /vagrant/')
+
+
+def version():
+    """
+    Print hmara version.
+    """
+    print('hmara version 0.0.1')
