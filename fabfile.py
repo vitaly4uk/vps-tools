@@ -3,7 +3,7 @@ from fabric.api import local, abort, settings, lcd
 from fabric.contrib.console import prompt
 
 
-__all__ = ['start_heroku_project', 'version', 'clone_project_template']
+__all__ = ['start_heroku_project', 'version', 'clone_project_template', 'install_requirements']
 
 vagrant_file_content = """Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/trusty64"
@@ -35,6 +35,18 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         sudo apt-get install -y postgresql redis-server git mc htop python-pip python-setuptools
         sudo apt-get build-dep -y python-psycopg2 python-imaging
         sudo pip install fabric
+        if [ "$(sudo -u postgres psql -l | grep vagrant | head -n 1 | awk '{print $1}')" != "vagrant" ]
+        then
+            printf "Create DB vagrant with user vagrant"
+            sudo -u postgres createdb vagrant
+            set +e
+            sudo -u postgres psql -c "create user vagrant with superuser password 'vagrant'"
+            if [ $? -ne 0 ]
+            then
+                sudo -u postgres psql -c "alter user vagrant with superuser password 'vagrant'"
+            fi
+            set -e
+        fi
         cd /vagrant
         if [ ! -f ./fabfile.py ]
         then
@@ -44,6 +56,9 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         then
             fab clone_project_template
         fi
+        fab install_requirements
+        honcho run python ./manage.py migrate
+        honcho run python ./manage.py createsuperuser
       SHELL
     s.privileged = false
   end
@@ -94,6 +109,23 @@ def clone_project_template():
         local('wget -q https://github.com/vitaly4uk/django-heroku-project-template/archive/master.zip')
         local('unzip ./master.zip')
         local('cp -R /home/vagrant/django-heroku-project-template-master/* /vagrant/')
+    with open('.env', 'w') as f:
+        f.write('PORT=8000\n')
+        f.write('DATABASE_URL=postgres://vagrant:vagrant@localhost:5432/vagrant\n')
+    with open('local_settings.py', 'w') as f:
+        f.write('DEBUG = True')
+
+
+def install_requirements():
+    with open('requirements.txt', 'r') as f:
+        requirements_list = [i.strip() for i in f.readlines()]
+    for line in requirements_list:
+        local('sudo pip install {}'.format(line))
+    response = local('pip freeze', capture=True)
+    freeze_list = response.splitlines()
+    freeze_dict = dict([item.split('==') for item in freeze_list])
+    with open('requirements.txt', 'w') as f:
+        f.writelines(['{}=={}\n'.format(i, freeze_dict[i]) for i in requirements_list])
 
 
 def version():
