@@ -36,8 +36,14 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         sudo apt-get build-dep -y python-psycopg2 python-imaging
         sudo pip install fabric
         cd /vagrant
-        wget -q https://raw.githubusercontent.com/vitaly4uk/vps-tools/master/fabfile.py
-        fab clone_project_template
+        if [ ! -f ./fabfile.py ]
+        then
+            wget -q https://raw.githubusercontent.com/vitaly4uk/vps-tools/master/fabfile.py
+        fi
+        if [ ! -f ./manage.py ]
+        then
+            fab clone_project_template
+        fi
       SHELL
     s.privileged = false
   end
