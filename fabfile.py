@@ -1,9 +1,14 @@
 from __future__ import unicode_literals, print_function
-from fabric.api import local, abort, settings, lcd
+from StringIO import StringIO
+from fabric.api import local, abort, settings, lcd, get, env, hosts, sudo, reboot
 from fabric.contrib.console import prompt
+from fabric.context_managers import cd, shell_env
+from fabric.contrib.files import exists, upload_template, put
 
+__all__ = ['start_heroku_project', 'version', 'clone_project_template', 'install_requirements', 'start_hmara_project',
+           'destroy_hmara_project', 'init_hmara_server']
 
-__all__ = ['start_heroku_project', 'version', 'clone_project_template', 'install_requirements']
+env.use_ssh_config = True
 
 vagrant_file_content = """Vagrant.configure("2") do |config|
   config.vm.box = "ubuntu/trusty64"
@@ -133,3 +138,83 @@ def version():
     Print hmara version.
     """
     print('hmara version 0.0.1')
+
+
+def init_hmara_server():
+    sudo('apt-get update')
+    sudo('apt-get install -y postgresql python3.5-dev redis-server git mc htop python-pip python-setuptools')
+    sudo('apt-get build-dep -y python3-psycopg2 python-psycopg2 python-imaging')
+
+@hosts('hotels')
+def start_hmara_project(username, repo_url):
+    if exists('.port_number'):
+        port_number_file = StringIO()
+        get('.port_number', port_number_file)
+        port_number = port_number_file.getvalue()
+    else:
+        port_number = "8011"
+    port_number = int(port_number) + 1
+    put(StringIO(str(port_number)), '.port_number')
+
+    home_folder = '/home/{username}'.format(username=username)
+    sudo('id -u {username} &>/dev/null || useradd --shell /bin/false {username}'.format(username=username))
+    if not exists(home_folder):
+        sudo('mkhomedir_helper {username}'.format(username=username))
+    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
+        if not exists('./{username}'.format(username=username), use_sudo=True):
+            sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
+        if not exists('./venv', use_sudo=True):
+            runtime_file = StringIO()
+            get('/home/{username}/{username}/runtime.txt'.format(username=username), runtime_file)
+            runtime = runtime_file.getvalue()[:10]
+            if runtime == 'python-2.7':
+                sudo('virtualenv venv')
+            elif runtime == 'python-3.5':
+                sudo('virtualenv venv --python=/usr/bin/python3.5')
+        sudo('./venv/bin/pip install --upgrade pip', pty=False)
+        sudo('./venv/bin/pip install honcho[export]', pty=False)
+        sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
+        context = {
+            'port': port_number,
+            'username': username,
+        }
+        upload_template('.env.tmpl', destination='/tmp/.env'.format(username=username), context=context, mode=0644,
+                        template_dir='./templates')
+        sudo('yes | cp /tmp/.env /home/{username}/{username}/.env'.format(username=username))
+        sudo('chmod 0300 /home/{username}/{username}/.env'.format(username=username))
+        if not exists('logs'):
+            sudo('mkdir logs')
+        if not exists('templates'):
+            sudo('mkdir templates')
+        sudo('/home/{username}/venv/bin/python /home/{username}/{username}/manage.py collectstatic --noinput'.format(username=username))
+        put('templates/supervisord.conf', '/tmp/supervisord.conf', mode=0644)
+        sudo('yes | cp /tmp/supervisord.conf /home/{username}/templates/supervisord.conf'.format(username=username))
+    with cd(home_folder):
+        upload_template('./templates/nginx.conf', mode=0644, use_sudo=True, context=context,
+                        destination='/etc/nginx/sites-available/{username}'.format(username=username))
+        sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
+        sudo('./venv/bin/honcho export --app-root ./{username} --log /home/{username}/logs --template-dir /home/{username}/templates supervisord /etc/supervisor/conf.d'.format(username=username))
+        sudo('supervisorctl reload')
+        sudo('supervisorctl status')
+        #sudo('service nginx stop')
+        #sudo('letsencrypt certonly --standalone -d {server_name} -d {username}.vomelchuk.com'.format(server_name=server_name, username=username))
+        sudo('service nginx reload')
+        sudo('service nginx status')
+
+@hosts('hotels')
+def destroy_hmara_project(username):
+    supervisor_file_name = '/etc/supervisor/conf.d/{username}.conf'.format(username=username)
+    nginx_file_name = '/etc/nginx/sites-enabled/{username}'.format(username=username)
+    if exists(supervisor_file_name):
+        sudo('supervisorctl stop {username}:*'.format(username=username))
+        sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
+        sudo('supervisorctl reload')
+        sudo('supervisorctl status')
+    if exists('/var/log/{username}'.format(username=username)):
+        sudo('rm -rf /var/log/{username}'.format(username=username))
+    if exists(nginx_file_name):
+        sudo('rm -rf {}'.format(nginx_file_name))
+        sudo('service nginx reload')
+        sudo('service nginx status')
+    sudo('userdel {}'.format(username))
+    sudo('rm -rf /home/{}'.format(username))
