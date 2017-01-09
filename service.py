@@ -17,7 +17,7 @@ def status():
 @hosts('hotels')
 def nginx(command):
     """
-    Usage: service.nginx:{start | stop | restart | reload | force-reload | status | configtest | rotate | upgrade}
+    Usage: service.nginx:{start|stop|restart|reload|force-reload|status|configtest|rotate|upgrade}
     """
     if command in ['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest', 'rotate', 'upgrade']:
         sudo('service nginx {}'.format(command))

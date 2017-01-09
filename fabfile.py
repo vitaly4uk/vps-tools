@@ -1,6 +1,5 @@
 from __future__ import unicode_literals, print_function
-import project
-import service
+import project, service, config
 
 from StringIO import StringIO
 from fabric.api import local, abort, settings, lcd, get, env, hosts, sudo, reboot, task
@@ -141,7 +140,7 @@ def version():
     """
     Print hmara version.
     """
-    print('hmara version 0.0.2')
+    print('hmara version 0.0.3')
 
 
 def init_hmara_server():

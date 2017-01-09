@@ -44,7 +44,7 @@ def create(username, repo_url):
         upload_template('.env.tmpl', destination='/tmp/.env'.format(username=username), context=context, mode=0644,
                         template_dir='./templates')
         sudo('yes | cp /tmp/.env /home/{username}/{username}/.env'.format(username=username))
-        sudo('chmod 0300 /home/{username}/{username}/.env'.format(username=username))
+        sudo('chmod 0600 /home/{username}/{username}/.env'.format(username=username))
         if not exists('logs'):
             sudo('mkdir logs')
         if not exists('templates'):
