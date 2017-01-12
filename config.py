@@ -1,7 +1,8 @@
 from __future__ import unicode_literals, print_function
 from StringIO import StringIO
 import six
-from fabric.api import task, hosts, sudo, settings, cd, shell_env, get, put
+from fabric.api import task, hosts, sudo, settings, cd, shell_env, get
+from fabric.contrib.files import upload_template, put
 
 
 def load_environment_dict(username):
@@ -45,9 +46,5 @@ def set(username, **kwargs):
     for k, v in six.iteritems(env_dict):
         print('{}={}'.format(k, v))
     store_environment_dict(username=username, env_dict=env_dict)
-    home_folder = '/home/{username}'.format(username=username)
-    with cd(home_folder):
-        sudo('./venv/bin/honcho export --app-root ./{username} --log /home/{username}/logs --template-dir /home/{username}/templates supervisord /etc/supervisor/conf.d'.format(
-                username=username))
-        sudo('supervisorctl reload')
-        sudo('supervisorctl status')
+    sudo('supervisorctl restart {}'.format(username))
+    sudo('supervisorctl status')

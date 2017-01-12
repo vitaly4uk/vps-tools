@@ -140,7 +140,7 @@ def version():
     """
     Print hmara version.
     """
-    print('hmara version 0.0.3')
+    print('hmara version 0.0.4')
 
 
 def init_hmara_server():

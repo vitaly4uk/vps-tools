@@ -1,7 +1,15 @@
 from __future__ import unicode_literals
+
+import os
 from StringIO import StringIO
 from fabric.api import task, hosts, sudo, get, settings, shell_env, cd
-from fabric.contrib.files import exists, upload_template, put
+from fabric.contrib.files import exists, upload_template, put, append
+import string
+import random
+
+
+def id_generator(size=6, chars=string.ascii_lowercase):
+    return ''.join(random.choice(chars) for _ in range(size))
 
 
 @task
@@ -15,9 +23,21 @@ def create(username, repo_url):
         get('.port_number', port_number_file)
         port_number = port_number_file.getvalue()
     else:
-        port_number = "8011"
+        port_number = "8010"
     port_number = int(port_number) + 1
     put(StringIO(str(port_number)), '.port_number')
+
+    context = {
+        'port': port_number,
+        'username': username,
+        'ENV_PATH': os.environ['PATH'],
+        'db_username': id_generator(12),
+        'db_password': id_generator(12),
+    }
+
+    with settings(sudo_user='postgres'):
+        sudo('createdb {username}'.format(username=username))
+        sudo('psql -c "create user {db_username} with superuser password \'{db_password}\'"'.format(**context))
 
     home_folder = '/home/{username}'.format(username=username)
     sudo('id -u {username} &>/dev/null || useradd --shell /bin/false {username}'.format(username=username))
@@ -37,31 +57,29 @@ def create(username, repo_url):
         sudo('./venv/bin/pip install --upgrade pip', pty=False)
         sudo('./venv/bin/pip install honcho[export]', pty=False)
         sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
-        context = {
-            'port': port_number,
-            'username': username,
-        }
-        upload_template('.env.tmpl', destination='/tmp/.env'.format(username=username), context=context, mode=0644,
-                        template_dir='./templates')
-        sudo('yes | cp /tmp/.env /home/{username}/{username}/.env'.format(username=username))
-        sudo('chmod 0600 /home/{username}/{username}/.env'.format(username=username))
+
+        db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
+        env = [
+            'PORT={port_number}'.format(port_number=port_number),
+            'DATABASE_URL={db_url}'.format(db_url=db_url),
+            'PATH=/home/{username}/venv/bin:{path}'.format(username=username, path=os.environ['PATH'])
+        ]
+        append('./{username}/.env'.format(username=username), env, use_sudo=True)
         if not exists('logs'):
             sudo('mkdir logs')
-        if not exists('templates'):
-            sudo('mkdir templates')
-        sudo('/home/{username}/venv/bin/python /home/{username}/{username}/manage.py collectstatic --noinput'.format(username=username))
-        put('templates/supervisord.conf', '/tmp/supervisord.conf', mode=0644)
-        sudo('yes | cp /tmp/supervisord.conf /home/{username}/templates/supervisord.conf'.format(username=username))
-    with cd(home_folder):
-        upload_template('./templates/nginx.conf', mode=0644, use_sudo=True, context=context,
-                        destination='/etc/nginx/sites-available/{username}'.format(username=username))
+        with cd('{username}'.format(username=username)):
+            sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(username=username))
+            sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+    upload_template('./templates/nginx.conf', mode=0644, use_sudo=True, context=context,
+                    destination='/etc/nginx/sites-available/{username}'.format(username=username))
+    if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
-        sudo('./venv/bin/honcho export --app-root ./{username} --log /home/{username}/logs --template-dir /home/{username}/templates supervisord /etc/supervisor/conf.d'.format(username=username))
-        sudo('supervisorctl reload')
-        sudo('supervisorctl status')
-        sudo('service nginx reload')
-        sudo('service nginx status')
-
+    upload_template('./templates/supervisord.conf', mode=0644, use_sudo=True, context=context,
+                    destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
+    sudo('supervisorctl reload')
+    sudo('supervisorctl status')
+    sudo('service nginx reload')
+    sudo('service nginx status')
 
 @task
 @hosts('hotels')
@@ -72,7 +90,7 @@ def destroy(username):
     supervisor_file_name = '/etc/supervisor/conf.d/{username}.conf'.format(username=username)
     nginx_file_name = '/etc/nginx/sites-enabled/{username}'.format(username=username)
     if exists(supervisor_file_name):
-        sudo('supervisorctl stop {username}:*'.format(username=username))
+        sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
         sudo('supervisorctl reload')
         sudo('supervisorctl status')
@@ -82,9 +100,27 @@ def destroy(username):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
         sudo('service nginx status')
+    with settings(sudo_user='postgres'):
+        sudo('dropdb {username}'.format(username=username))
     sudo('userdel {}'.format(username))
     sudo('rm -rf /home/{}'.format(username))
 
-#@task(default=True)
-#def list():
-#    run('uname -a')
+
+@task
+@hosts('hotels')
+def run(username, cmd):
+    """
+    Run command on project environment. Usage: project.run:<username>,cmd='<command>'
+    """
+    home_folder = '/home/{username}'.format(username=username)
+    with cd('/home/{username}/{username}'.format(username=username)), settings(sudo_user=username), shell_env(HOME=home_folder):
+        sudo('/home/{username}/venv/bin/honcho run {cmd}'.format(username=username, cmd=cmd))
+
+
+@task
+@hosts('hotels')
+def restart(username):
+    """
+    Restart project. Usage: project.restart:<username>
+    """
+    sudo('supervisorctl restart {username}'.format(username=username))
