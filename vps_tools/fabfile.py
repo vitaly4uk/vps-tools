@@ -7,8 +7,6 @@ from fabric.contrib.console import prompt
 from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, upload_template, put
 
-#__all__ = ['start_heroku_project', 'version', 'clone_project_template', 'install_requirements', 'start_hmara_project',
-#           'destroy_hmara_project', 'init_hmara_server']
 
 env.use_ssh_config = True
 
@@ -57,7 +55,7 @@ vagrant_file_content = """Vagrant.configure("2") do |config|
         cd /vagrant
         if [ ! -f ./fabfile.py ]
         then
-            wget -q https://raw.githubusercontent.com/vitaly4uk/vps-tools/master/fabfile.py
+            wget -q https://raw.githubusercontent.com/vitaly4uk/vps_tools/master/fabfile.py
         fi
         if [ ! -f ./manage.py ]
         then
@@ -140,7 +138,8 @@ def version():
     """
     Print hmara version.
     """
-    print('hmara version 0.0.4')
+    with open('/var/lib/vps_tools/VERSION', 'r') as version_file:
+        print('hmara version {}'.format(version_file.read()))
 
 
 def init_hmara_server():

@@ -70,11 +70,11 @@ def create(username, repo_url):
         with cd('{username}'.format(username=username)):
             sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(username=username))
             sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
-    upload_template('./templates/nginx.conf', mode=0644, use_sudo=True, context=context,
+    upload_template('/var/lib/vps_tools/nginx.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
     if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
-    upload_template('./templates/supervisord.conf', mode=0644, use_sudo=True, context=context,
+    upload_template('/var/lib/vps_tools/supervisord.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
     sudo('supervisorctl reload')
     sudo('supervisorctl status')
