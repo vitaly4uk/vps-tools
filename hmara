@@ -1,6 +1,53 @@
 #!/usr/bin/env python
-from fabric.api import execute
+from __future__ import unicode_literals, print_function
+import argparse
+from fabric.api import execute, prompt
 
 from vps_tools.fabfile import version
+from vps_tools.project import create, destroy
+from vps_tools.config import list, set
 
-execute(version)
+def execute_project(args):
+    if args.subcommand == 'create':
+        repo_url = args.repo_url
+        if repo_url is None:
+            repo_url = prompt('Please, input repository url of project:')
+        execute(create, args.name, repo_url=repo_url)
+    elif args.subcommand == 'destroy':
+        execute(destroy, args.name)
+
+def execute_config(args):
+    if args.subcommand == 'list':
+        execute(list, args.name)
+    elif args.subcommand == 'set':
+        kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
+        execute(set, args.name, **kwars)
+
+def execute_version(args):
+    execute(version)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
+
+    subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
+
+    parser_project = subparser.add_parser('project', help='#  Manage projects')
+    parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy'])
+    parser_project.add_argument('name', help='project name')
+    parser_project.add_argument('--repo_url', help='git repository url with project')
+    parser_project.set_defaults(func=execute_project)
+
+    parser_config = subparser.add_parser('config', help='#  Manage projects config vars')
+    parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
+    parser_config.add_argument('--vars', nargs='+', help='<key>=<value> pairs of vars')
+    parser_config.add_argument('name')
+    parser_config.set_defaults(func=execute_config)
+
+    parser_version = subparser.add_parser('version', help='#  Print hmara version')
+    parser_version.set_defaults(func=execute_version)
+
+    parser_service = subparser.add_parser('service', help='#  Manage services')
+    parser_service.add_argument('name', choices=['nginx', 'postgres', 'status'])
+
+    args = parser.parse_args()
+    args.func(args)
