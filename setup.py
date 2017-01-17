@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from setuptools import setup
 
 with open('vps_tools/VERSION', 'r') as version_file:
