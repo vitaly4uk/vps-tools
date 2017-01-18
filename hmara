@@ -6,6 +6,8 @@ from fabric.api import execute, prompt
 from vps_tools.fabfile import version
 from vps_tools.project import create, destroy
 from vps_tools.config import list, set
+from vps_tools.service import nginx, postgresql
+
 
 def execute_project(args):
     if args.subcommand == 'create':
@@ -16,6 +18,7 @@ def execute_project(args):
     elif args.subcommand == 'destroy':
         execute(destroy, args.name)
 
+
 def execute_config(args):
     if args.subcommand == 'list':
         execute(list, args.name)
@@ -23,8 +26,20 @@ def execute_config(args):
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, **kwars)
 
+
+def execute_service(args):
+    """
+    Service commands
+    """
+    execute(args.name, args.service_command)
+
+
 def execute_version(args):
+    """
+    Show version
+    """
     execute(version)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
@@ -47,7 +62,11 @@ if __name__ == '__main__':
     parser_version.set_defaults(func=execute_version)
 
     parser_service = subparser.add_parser('service', help='#  Manage services')
-    parser_service.add_argument('name', choices=['nginx', 'postgres', 'status'])
+    parser_service.add_argument('name', choices=['nginx', 'postgresql'], help='service name')
+    parser_service.add_argument('service_command',
+                                choices=['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest',
+                                         'rotate', 'upgrade'])
+    parser_service.set_defaults(func=execute_service)
 
     args = parser.parse_args()
     args.func(args)
