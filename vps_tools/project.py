@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 
 import os
 from StringIO import StringIO
+from time import sleep
+
 from fabric.api import task, hosts, sudo, get, settings, shell_env, cd
 from fabric.contrib.files import exists, upload_template, put, append
 import string
@@ -77,8 +79,10 @@ def create(username, repo_url):
     upload_template('/var/lib/vps_tools/supervisord.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
     sudo('supervisorctl reload')
+    sleep(3)
     sudo('supervisorctl status')
     sudo('service nginx reload')
+    sleep(3)
     sudo('service nginx status')
 
 @task
@@ -93,12 +97,14 @@ def destroy(username):
         sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
         sudo('supervisorctl reload')
+        sleep(3)
         sudo('supervisorctl status')
     if exists('/var/log/{username}'.format(username=username)):
         sudo('rm -rf /var/log/{username}'.format(username=username))
     if exists(nginx_file_name):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
+        sleep(3)
         sudo('service nginx status')
     with settings(sudo_user='postgres'):
         sudo('dropdb {username}'.format(username=username))
