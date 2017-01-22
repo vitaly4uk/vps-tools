@@ -78,7 +78,7 @@ def execute_version(args):
 
 
 def execute_update(args):
-    local('sudo pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+    local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
 def execute_domain(args):
