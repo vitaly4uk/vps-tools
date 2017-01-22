@@ -29,6 +29,8 @@ def execute_project(args):
         execute(run, args.name, 'git reset --hard HEAD~')
         execute(run, args.name, 'git pull origin')
         execute(restart, args.name)
+        execute(run, args.name, 'python ./manage.py collectstatic --noinput')
+        execute(run, args.name, 'python ./manage.py migrate --noinput')
 
 
 
@@ -44,7 +46,10 @@ def execute_service(args):
     """
     Service commands
     """
-    execute(args.name, args.service_command)
+    if args.name == 'nginx':
+        execute(nginx, args.service_command)
+    elif args.name == 'postgresql':
+        execute(postgresql, args.service_command)
 
 
 def execute_version(args):
