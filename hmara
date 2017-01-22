@@ -4,7 +4,7 @@ import argparse
 from fabric.api import execute, prompt
 
 from vps_tools.fabfile import version
-from vps_tools.project import create, destroy
+from vps_tools.project import create, destroy, run, restart
 from vps_tools.config import list, set
 from vps_tools.service import nginx, postgresql
 
@@ -17,6 +17,19 @@ def execute_project(args):
         execute(create, args.name, repo_url=repo_url)
     elif args.subcommand == 'destroy':
         execute(destroy, args.name)
+    elif args.subcommand == 'run':
+        if args.cmd is None:
+            cmd = prompt('Please, input command:')
+        else:
+            cmd = ' '.join(args.cmd)
+        execute(run, args.name, cmd)
+    elif args.subcommand == 'restart':
+        execute(restart, args.name)
+    elif args.subcommand == 'deploy':
+        execute(run, args.name, 'git reset --hard HEAD~')
+        execute(run, args.name, 'git pull origin')
+        execute(restart, args.name)
+
 
 
 def execute_config(args):
@@ -47,9 +60,10 @@ if __name__ == '__main__':
     subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
 
     parser_project = subparser.add_parser('project', help='#  Manage projects')
-    parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy'])
+    parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy', 'run', 'restart'])
     parser_project.add_argument('name', help='project name')
     parser_project.add_argument('--repo_url', help='git repository url with project')
+    parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
     parser_project.set_defaults(func=execute_project)
 
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')
