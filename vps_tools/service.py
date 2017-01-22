@@ -2,17 +2,6 @@ from __future__ import unicode_literals
 from fabric.api import task, hosts, sudo
 
 
-@task(default=True)
-@hosts('hotels')
-def status():
-    """
-    Show sttus of all services
-    """
-    sudo('service postgresql status')
-    sudo('service nginx status')
-    sudo('supervisorctl status')
-
-
 @task
 @hosts('hotels')
 def nginx(command):

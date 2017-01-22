@@ -20,6 +20,6 @@ setup(
             'vps_tools/VERSION'
         ])
     ],
-    install_requires = ['fabric'],
-    scripts = ['hmara']
+    install_requires=['fabric'],
+    scripts=['hmara']
 )

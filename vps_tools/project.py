@@ -130,3 +130,13 @@ def restart(username):
     Restart project. Usage: project.restart:<username>
     """
     sudo('supervisorctl restart {username}'.format(username=username))
+
+
+@task
+@hosts('hotels')
+def list_projects():
+    """
+    Return list of projects
+    """
+    with cd('/home'):
+        sudo('for i in $(ls -d */); do echo ${i%%/}; done')

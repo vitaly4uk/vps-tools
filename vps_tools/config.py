@@ -2,7 +2,7 @@ from __future__ import unicode_literals, print_function
 from StringIO import StringIO
 import six
 from fabric.api import task, hosts, sudo, settings, cd, shell_env, get
-from fabric.contrib.files import upload_template, put
+from fabric.contrib.files import put
 
 
 def load_environment_dict(username):

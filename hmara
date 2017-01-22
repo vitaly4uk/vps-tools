@@ -4,31 +4,29 @@ import argparse
 from fabric.api import execute, prompt, env, local
 
 from vps_tools.fabfile import version
-from vps_tools.project import create, destroy, run, restart
+from vps_tools.project import create, destroy, run, restart, list_projects
 from vps_tools.config import list, set
 from vps_tools.service import nginx, postgresql
 import logging
 
-# set up logging to file - see previous section for more details
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
                     filename='/tmp/hmara.log',
                     filemode='w')
-# define a Handler which writes INFO messages or higher to the sys.stderr
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
-# set a format which is simpler for console use
 formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-# tell the handler to use this format
 console.setFormatter(formatter)
-# add the handler to the root logger
 logging.getLogger('').addHandler(console)
 
 env.use_ssh_config = True
 
 
 def execute_project(args):
+    if not args.subcommand == 'list' and args.name is None:
+        print('--name is required')
+        return
     if args.subcommand == 'create':
         repo_url = args.repo_url
         if repo_url is None:
@@ -50,11 +48,13 @@ def execute_project(args):
         execute(run, args.name, 'python ./manage.py collectstatic --noinput')
         execute(run, args.name, 'python ./manage.py migrate --noinput')
         execute(restart, args.name)
+    else:
+        execute(list_projects)
 
 
 def execute_config(args):
     if args.subcommand == 'list':
-        execute(list, args.name)
+        execute(list_projects, args.name)
     elif args.subcommand == 'set':
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, **kwars)
@@ -81,14 +81,18 @@ def execute_update(args):
     local('sudo pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
+def execute_domain(args):
+    pass
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
     subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
 
     parser_project = subparser.add_parser('project', help='#  Manage projects')
-    parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy', 'run', 'restart'])
-    parser_project.add_argument('name', help='project name')
+    parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy', 'run', 'restart', 'list'])
+    parser_project.add_argument('--name', help='project name')
     parser_project.add_argument('--repo_url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
     parser_project.set_defaults(func=execute_project)
@@ -99,8 +103,8 @@ if __name__ == '__main__':
     parser_config.add_argument('name')
     parser_config.set_defaults(func=execute_config)
 
-    parser_version = subparser.add_parser('version', help='#  Print hmara version')
-    parser_version.set_defaults(func=execute_version)
+    parser_domain = subparser.add_parser('domain', help='# Manage project domains')
+    parser_domain.set_defaults(func=execute_domain)
 
     parser_service = subparser.add_parser('service', help='#  Manage services')
     parser_service.add_argument('name', choices=['nginx', 'postgresql'], help='service name')
@@ -108,6 +112,9 @@ if __name__ == '__main__':
                                 choices=['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest',
                                          'rotate', 'upgrade'])
     parser_service.set_defaults(func=execute_service)
+
+    parser_version = subparser.add_parser('version', help='#  Print hmara version')
+    parser_version.set_defaults(func=execute_version)
 
     parser_update = subparser.add_parser('update', help='#  Update hmara')
     parser_update.set_defaults(func=execute_update)
