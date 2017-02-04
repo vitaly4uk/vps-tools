@@ -107,9 +107,8 @@ def destroy(username):
         sleep(3)
         sudo('service nginx status')
     with settings(sudo_user='postgres'):
-        sudo('dropdb {username}'.format(username=username))
-    sudo('userdel {}'.format(username))
-    sudo('rm -rf /home/{}'.format(username))
+        sudo('dropdb --if-exists {username}'.format(username=username))
+    sudo('deluser --remove-home {}'.format(username))
 
 
 @task
@@ -139,4 +138,4 @@ def list_projects():
     Return list of projects
     """
     with cd('/home'):
-        sudo('for i in $(ls -d */); do echo ${i%%/}; done')
+        sudo('for i in $(ls -d */ -i ubuntu); do echo ${i%%/}; done')
