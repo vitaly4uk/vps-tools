@@ -56,9 +56,20 @@ def create(username, repo_url):
                 sudo('virtualenv venv')
             elif runtime == 'python-3.5':
                 sudo('virtualenv venv --python=/usr/bin/python3.5')
+
         sudo('./venv/bin/pip install --upgrade pip', pty=False)
         sudo('./venv/bin/pip install honcho[export]', pty=False)
         sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
+
+        migrate_command = 'migrate'
+        requirements_file = StringIO()
+        get('/home/{username}/{username}/requirements.txt'.format(username=username), requirements_file)
+        for line in requirements_file.getvalue().split():
+            lib_name, lib_version = line.split('==')
+            if lib_name == 'Django':
+                v1, v2, v3 = lib_version.split('.')
+                if int(v2) < 7:
+                    migrate_command = 'syncdb'
 
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
         env = [
@@ -71,7 +82,7 @@ def create(username, repo_url):
             sudo('mkdir logs')
         with cd('{username}'.format(username=username)):
             sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(username=username))
-            sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+            sudo('/home/{username}/venv/bin/honcho run python ./manage.py {migrate_command} --noinput'.format(username=username, migrate_command=migrate_command))
     upload_template('/var/lib/vps_tools/nginx.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
     if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
