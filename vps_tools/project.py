@@ -61,7 +61,8 @@ def create(username, repo_url):
         sudo('./venv/bin/pip install honcho[export]', pty=False)
         sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
 
-        migrate_command = 'migrate'
+        should_sync = False
+        has_south = False
         requirements_file = StringIO()
         get('/home/{username}/{username}/requirements.txt'.format(username=username), requirements_file)
         for line in requirements_file.getvalue().split():
@@ -69,7 +70,9 @@ def create(username, repo_url):
             if lib_name == 'Django':
                 v1, v2, v3 = lib_version.split('.')
                 if int(v2) < 7:
-                    migrate_command = 'syncdb'
+                    should_sync = True
+            if lib_name == 'South':
+                has_south = True
 
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
         env = [
@@ -80,9 +83,16 @@ def create(username, repo_url):
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
         if not exists('logs'):
             sudo('mkdir logs')
+
         with cd('{username}'.format(username=username)):
             sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(username=username))
-            sudo('/home/{username}/venv/bin/honcho run python ./manage.py {migrate_command} --noinput'.format(username=username, migrate_command=migrate_command))
+            if should_sync:
+                sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(username=username))
+                if has_south:
+                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+            else:
+                sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+
     upload_template('/var/lib/vps_tools/nginx.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
     if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
