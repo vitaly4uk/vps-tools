@@ -66,6 +66,8 @@ def create(username, repo_url):
         requirements_file = StringIO()
         get('/home/{username}/{username}/requirements.txt'.format(username=username), requirements_file)
         for line in requirements_file.getvalue().split():
+            if '==' not in line:
+                continue
             lib_name, lib_version = line.split('==')
             if lib_name == 'Django':
                 v1, v2, v3 = lib_version.split('.')
