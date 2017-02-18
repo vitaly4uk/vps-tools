@@ -55,7 +55,7 @@ def execute_project(args):
 
 def execute_config(args):
     if args.subcommand == 'list':
-        execute(list_projects, args.name)
+        execute(list, args.name)
     elif args.subcommand == 'set':
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, **kwars)
