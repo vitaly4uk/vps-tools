@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function
 import argparse
 from fabric.api import execute, prompt, env, local
 import botocore.session
+import json
 
 from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects
@@ -52,7 +53,7 @@ def execute_project(args):
         client = session.create_client('sqs', region_name='us-east-1',
                                        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                                        aws_access_key_id=AWS_ACCESS_KEY_ID)
-        client.send_message(QueueUrl=SQS_URL, MessageBody='{"cmd": "deploy", "name":"{}"}'.format(args.name))
+        client.send_message(QueueUrl=SQS_URL, MessageBody=json.dumps({'cmd': 'deploy', 'name': args.name}))
     else:
         execute(list_projects)
 
