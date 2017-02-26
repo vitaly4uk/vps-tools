@@ -4,6 +4,8 @@ import argparse
 from fabric.api import execute, prompt, env, local
 import botocore.session
 import json
+import random
+import string
 
 from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects
@@ -50,10 +52,32 @@ def execute_project(args):
         execute(restart, args.name)
     elif args.subcommand == 'deploy':
         session = botocore.session.get_session()
-        client = session.create_client('sqs', region_name='us-east-1',
+        client = session.create_client('sqs', region_name='us-east-2',
                                        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                                        aws_access_key_id=AWS_ACCESS_KEY_ID)
-        client.send_message(QueueUrl=SQS_URL, MessageBody=json.dumps({'cmd': 'deploy', 'name': args.name}))
+
+        response_queue_name = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(60))
+        response = client.create_queue(QueueName=response_queue_name)
+        response_queue_url = response['QueueUrl']
+        data = {
+            'cmd': 'deploy',
+            'name': args.name,
+            'QueueUrl': response_queue_url
+        }
+        print(data)
+        client.send_message(QueueUrl=SQS_URL, MessageBody=json.dumps(data))
+        process_is_going = True
+        try:
+            while process_is_going:
+                response = client.receive_message(QueueUrl=response_queue_url)
+                if 'Messages' in response:
+                    for message in response['Messages']:
+                        if message['Body'] == 'END':
+                           process_is_going = False
+                        print(message['Body'])
+                        client.delete_message(QueueUrl=response_queue_url, ReceiptHandle=message['ReceiptHandle'])
+        finally:
+            client.delete_queue(QueueUrl=response_queue_url)
     else:
         execute(list_projects)
 
@@ -84,7 +108,7 @@ def execute_version(args):
 
 
 def execute_update(args):
-    local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+    local('sudo -H pip install --upgrade https://git.vomelchuk.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
 def execute_domain(args):
