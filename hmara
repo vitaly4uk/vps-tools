@@ -6,6 +6,10 @@ import botocore.session
 import json
 import random
 import string
+try:
+    from configparser import ConfigParser
+except ImportError:
+    from ConfigParser import ConfigParser
 
 from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects
@@ -26,8 +30,6 @@ logging.getLogger('').addHandler(console)
 
 env.use_ssh_config = True
 
-AWS_ACCESS_KEY_ID = 'AKIAJBRFIZ5JMZANYPGA'
-AWS_SECRET_ACCESS_KEY = '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'
 SQS_URL = 'https://sqs.us-east-1.amazonaws.com/455994469874/hmara'
 
 
@@ -108,7 +110,7 @@ def execute_version(args):
 
 
 def execute_update(args):
-    local('sudo -H pip install --upgrade https://git.vomelchuk.com/vitaly4uk/vps-tools/archive/master.zip')
+    local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
 def execute_domain(args):
@@ -116,6 +118,10 @@ def execute_domain(args):
 
 
 if __name__ == '__main__':
+    config = ConfigParser()
+    config.read('~/.hmara')
+    AWS_ACCESS_KEY_ID = config.get('AWS', 'ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config.get('AWS', 'SECRET_ACCESS_KEY')
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
     subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
