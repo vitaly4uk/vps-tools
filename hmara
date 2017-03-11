@@ -6,10 +6,11 @@ import botocore.session
 import json
 import random
 import string
+import os
 try:
-    from configparser import ConfigParser
+    from configparser import RawConfigParser
 except ImportError:
-    from ConfigParser import ConfigParser
+    from ConfigParser import RawConfigParser
 
 from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects
@@ -118,8 +119,8 @@ def execute_domain(args):
 
 
 if __name__ == '__main__':
-    config = ConfigParser()
-    config.read('~/.hmara')
+    config = RawConfigParser()
+    config.read(os.path.expanduser('~/.hmara'))
     AWS_ACCESS_KEY_ID = config.get('AWS', 'ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = config.get('AWS', 'SECRET_ACCESS_KEY')
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
