@@ -102,10 +102,10 @@ def create(username, repo_url):
     upload_template('/var/lib/vps_tools/supervisord.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
     sudo('supervisorctl reload')
-    sleep(3)
+    sleep(5)
     sudo('supervisorctl status')
     sudo('service nginx reload')
-    sleep(3)
+    sleep(5)
     sudo('service nginx status')
 
 @task
