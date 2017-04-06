@@ -102,11 +102,21 @@ def create(username, repo_url):
     upload_template('/var/lib/vps_tools/supervisord.conf', mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
     sudo('supervisorctl reload')
-    sleep(5)
-    sudo('supervisorctl status')
+    return_code = 1
+    with settings(warn_only=True):
+        while not return_code == 0:
+            sleep(3)
+            print('Try to get supervisor status')
+            result = sudo('supervisorctl status')
+            return_code = result.return_code
     sudo('service nginx reload')
-    sleep(5)
-    sudo('service nginx status')
+    return_code = 1
+    with settings(warn_only=True):
+        while not return_code == 0:
+            sleep(3)
+            print('Try to get nginx status')
+            result = sudo('service nginx status')
+            return_code = result.return_code
 
 @task
 @hosts('hotels')
@@ -120,15 +130,25 @@ def destroy(username):
         sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
         sudo('supervisorctl reload')
-        sleep(3)
-        sudo('supervisorctl status')
+        return_code = 1
+        with settings(warn_only=True):
+            while not return_code == 0:
+                sleep(3)
+                print('Try to get supervisor status')
+                result = sudo('supervisorctl status')
+                return_code = result.return_code
     if exists('/var/log/{username}'.format(username=username)):
         sudo('rm -rf /var/log/{username}'.format(username=username))
     if exists(nginx_file_name):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
-        sleep(3)
-        sudo('service nginx status')
+        return_code = 1
+        with settings(warn_only=True):
+            while not return_code == 0:
+                sleep(3)
+                print('Try to get nginx status')
+                result = sudo('service nginx status')
+                return_code = result.return_code
     with settings(sudo_user='postgres'):
         sudo('dropdb --if-exists {username}'.format(username=username))
     sudo('deluser --remove-home {}'.format(username))
