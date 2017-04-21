@@ -54,7 +54,6 @@ def execute_project(args):
     elif args.subcommand == 'restart':
         execute(restart, args.name)
     elif args.subcommand == 'deploy':
-        execute(run, args.name, 'git reset --hard HEAD~')
         execute(run, args.name, 'git pull origin')
         execute(run, args.name, 'pip install --upgrade -r requirements.txt')
         execute(run, args.name, 'python ./manage.py collectstatic --noinput')
