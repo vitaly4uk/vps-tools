@@ -20,6 +20,6 @@ setup(
             'vps_tools/VERSION'
         ])
     ],
-    install_requires=['fabric', 'botocore'],
+    install_requires=['fabric', 'botocore', 'dj_database_url'],
     scripts=['hmara']
 )

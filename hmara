@@ -2,11 +2,7 @@
 from __future__ import unicode_literals, print_function
 import argparse
 from fabric.api import execute, prompt, env, local
-import botocore.session
-import json
-import random
-import string
-import os
+
 try:
     from configparser import RawConfigParser
 except ImportError:
@@ -16,6 +12,7 @@ from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects
 from vps_tools.config import list, set
 from vps_tools.service import nginx, postgresql
+from vps_tools.pg import dump, restore
 import logging
 
 logging.basicConfig(level=logging.DEBUG,
@@ -81,6 +78,14 @@ def execute_service(args):
         execute(postgresql, args.service_command)
 
 
+def execute_pg(args):
+    """Database commands."""
+    if args.subcommand == 'dump':
+        execute(dump, args.name)
+    elif args.subcommand == 'restore':
+        execute(restore, args.name)
+
+
 def execute_version(args):
     """
     Show version
@@ -96,11 +101,10 @@ def execute_domain(args):
     pass
 
 
+def default_command():
+    print('Default')
+
 if __name__ == '__main__':
-    config = RawConfigParser()
-    config.read(os.path.expanduser('~/.hmara'))
-    AWS_ACCESS_KEY_ID = config.get('AWS', 'ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = config.get('AWS', 'SECRET_ACCESS_KEY')
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
     subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
@@ -133,6 +137,11 @@ if __name__ == '__main__':
 
     parser_update = subparser.add_parser('update', help='#  Update hmara')
     parser_update.set_defaults(func=execute_update)
+
+    parser_pg = subparser.add_parser('pg', help='#  Manage database')
+    parser_pg.add_argument('subcommand', choices=['dump', 'restore'])
+    parser_pg.add_argument('name', help='project name')
+    parser_pg.set_defaults(func=execute_pg)
 
     args = parser.parse_args()
     args.func(args)
