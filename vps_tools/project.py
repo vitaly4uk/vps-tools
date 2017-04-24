@@ -1,10 +1,9 @@
 from __future__ import unicode_literals
 
-import os
 from StringIO import StringIO
 from time import sleep
 
-from fabric.api import task, hosts, sudo, get, settings, shell_env, cd
+from fabric.api import task, hosts, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import exists, upload_template, put, append
 import string
 import random
@@ -32,7 +31,6 @@ def create(username, repo_url):
     context = {
         'port': port_number,
         'username': username,
-        'ENV_PATH': os.environ['PATH'],
         'db_username': id_generator(12),
         'db_password': id_generator(12),
     }
@@ -46,6 +44,8 @@ def create(username, repo_url):
     if not exists(home_folder):
         sudo('mkhomedir_helper {username}'.format(username=username))
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
+        remote_path = sudo('echo $PATH')
+        context.update({'ENV_PATH': remote_path})
         if not exists('./{username}'.format(username=username), use_sudo=True):
             sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
         if not exists('./venv', use_sudo=True):
@@ -80,7 +80,7 @@ def create(username, repo_url):
         env = [
             'PORT={port_number}'.format(port_number=port_number),
             'DATABASE_URL={db_url}'.format(db_url=db_url),
-            'PATH=/home/{username}/venv/bin:{path}'.format(username=username, path=os.environ['PATH'])
+            'PATH=/home/{username}/venv/bin:{path}'.format(username=username, path=remote_path)
         ]
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
         if not exists('logs'):
@@ -181,4 +181,9 @@ def list_projects():
     Return list of projects
     """
     with cd('/home'):
-        sudo('for i in $(ls -d */ -i ubuntu); do echo ${i%%/}; done')
+        with hide('output'):
+            result = sudo('for i in $(ls -d */); do echo ${i%%/}; done')
+    for i in result.splitlines():
+        if i == 'ubuntu':
+            continue
+        print i
