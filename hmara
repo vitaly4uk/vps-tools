@@ -80,6 +80,10 @@ def execute_service(args):
     """
     Service commands
     """
+    if args.host:
+        env.hosts = args.host
+    else:
+        env.hosts = ['hotels']
     if args.name == 'nginx':
         execute(nginx, args.service_command)
     elif args.name == 'postgresql':
@@ -88,6 +92,10 @@ def execute_service(args):
 
 def execute_pg(args):
     """Database commands."""
+    if args.host:
+        env.hosts = args.host
+    else:
+        env.hosts = ['hotels']
     if args.subcommand == 'dump':
         execute(dump, args.name)
     elif args.subcommand == 'restore':
@@ -140,6 +148,7 @@ if __name__ == '__main__':
     parser_service.add_argument('service_command',
                                 choices=['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest',
                                          'rotate', 'upgrade'])
+    parser_service.add_argument('--host', help='host name to run command on', nargs='+')
     parser_service.set_defaults(func=execute_service)
 
     parser_version = subparser.add_parser('version', help='#  Print hmara version')
@@ -151,6 +160,7 @@ if __name__ == '__main__':
     parser_pg = subparser.add_parser('pg', help='#  Manage database')
     parser_pg.add_argument('subcommand', choices=['dump', 'restore'])
     parser_pg.add_argument('name', help='project name')
+    parser_pg.add_argument('--host', help='host name to run command on', nargs='+')
     parser_pg.set_defaults(func=execute_pg)
 
     args = parser.parse_args()

@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 from StringIO import StringIO
 from time import sleep
 
-from fabric.api import task, hosts, sudo, get, settings, shell_env, cd, hide
+from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import exists, upload_template, put, append
 import string
 import random

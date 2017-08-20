@@ -1,9 +1,8 @@
 from __future__ import unicode_literals
-from fabric.api import task, hosts, sudo
+from fabric.api import task, sudo
 
 
 @task
-@hosts('hotels')
 def nginx(command):
     """
     Usage: service.nginx:{start|stop|restart|reload|force-reload|status|configtest|rotate|upgrade}
@@ -13,7 +12,6 @@ def nginx(command):
 
 
 @task
-@hosts('hotels')
 def postgresql(command):
     """
     Usage: service.postgresql:{start|stop|restart|reload|force-reload|status}

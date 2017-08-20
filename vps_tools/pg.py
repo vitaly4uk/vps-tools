@@ -1,8 +1,8 @@
 from __future__ import unicode_literals, print_function
 
 import dj_database_url
-from fabric.api import task, hosts, sudo, get, settings, shell_env, cd, hide
-from fabric.contrib.files import exists, upload_template, put, append
+from fabric.api import task, sudo, get, settings, shell_env, cd, hide
+from fabric.contrib.files import put
 import string
 import random
 from .config import load_environment_dict
@@ -13,7 +13,6 @@ def id_generator(size=6, chars=string.ascii_lowercase):
 
 
 @task
-@hosts('hotels')
 def dump(username):
     remote_env = load_environment_dict(username)
     database = dj_database_url.parse(remote_env['DATABASE_URL'])
@@ -25,7 +24,6 @@ def dump(username):
 
 
 @task
-@hosts('hotels')
 def restore(username):
     remote_env = load_environment_dict(username)
     database = dj_database_url.parse(remote_env['DATABASE_URL'])
