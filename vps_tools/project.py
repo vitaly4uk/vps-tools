@@ -14,7 +14,6 @@ def id_generator(size=6, chars=string.ascii_lowercase):
 
 
 @task
-@hosts('hotels')
 def create(username, repo_url):
     """
     Create new project. Usage project.create:<username>,repo_url=<github_url>
@@ -119,7 +118,6 @@ def create(username, repo_url):
             return_code = result.return_code
 
 @task
-@hosts('hotels')
 def destroy(username):
     """
     Destroy project. Delete all data and config files. Usage: project.destroy:<username>
@@ -155,7 +153,6 @@ def destroy(username):
 
 
 @task
-@hosts('hotels')
 def run(username, cmd):
     """
     Run command on project environment. Usage: project.run:<username>,cmd='<command>'
@@ -166,7 +163,6 @@ def run(username, cmd):
 
 
 @task
-@hosts('hotels')
 def restart(username):
     """
     Restart project. Usage: project.restart:<username>
@@ -175,7 +171,6 @@ def restart(username):
 
 
 @task
-@hosts('hotels')
 def list_projects():
     """
     Return list of projects

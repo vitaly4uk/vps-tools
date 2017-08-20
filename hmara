@@ -32,6 +32,10 @@ SQS_URL = 'https://sqs.us-east-1.amazonaws.com/455994469874/hmara'
 
 
 def execute_project(args):
+    if args.host:
+        env.hosts = args.host
+    else:
+        env.hosts = ['hotels']
     if not args.subcommand == 'list' and args.name is None:
         print('--name is required')
         return
@@ -61,6 +65,10 @@ def execute_project(args):
 
 
 def execute_config(args):
+    if args.host:
+        env.hosts = args.host
+    else:
+        env.hosts = ['hotels']
     if args.subcommand == 'list':
         execute(list, args.name)
     elif args.subcommand == 'set':
@@ -114,11 +122,13 @@ if __name__ == '__main__':
     parser_project.add_argument('--name', help='project name')
     parser_project.add_argument('--repo_url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
+    parser_project.add_argument('--host', help='host name to run command on', nargs='+')
     parser_project.set_defaults(func=execute_project)
 
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')
     parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
     parser_config.add_argument('--vars', nargs='+', help='<key>=<value> pairs of vars')
+    parser_config.add_argument('--host', help='host name to run command on', nargs='+')
     parser_config.add_argument('name')
     parser_config.set_defaults(func=execute_config)
 

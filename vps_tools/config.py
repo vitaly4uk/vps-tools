@@ -25,7 +25,6 @@ def store_environment_dict(username, env_dict):
 
 
 @task(default=True)
-@hosts('hotels')
 def list(username):
     """
     List environment variables of project. Usage: config.list:<username>
@@ -36,7 +35,6 @@ def list(username):
 
 
 @task
-@hosts('hotels')
 def set(username, **kwargs):
     """
     Set environment variable of project. Usage config.set:<username>[,<key>=<value>, ...]
