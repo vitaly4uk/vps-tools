@@ -144,7 +144,7 @@ def version():
         with open('vps_tools/VERSION', 'r') as version_file:
             print('hmara version {}'.format(version_file.read()))
     else:
-        print('hmara version {}'.format(pkg_resources.resource_string('vps_tools', 'VERSION')))
+        print('hmara version {}'.format(pkg_resources.resource_string('vps-tools', 'VERSION')))
 
 
 def init_hmara_server():

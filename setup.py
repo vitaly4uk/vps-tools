@@ -5,7 +5,7 @@ with open('vps_tools/VERSION', 'r') as version_file:
     version = version_file.read()
 
 setup(
-    name='vps_tools',
+    name='vps-tools',
     version=version,
     packages=['vps_tools'],
     url='https://github.com/vitaly4uk/vps_tools',
