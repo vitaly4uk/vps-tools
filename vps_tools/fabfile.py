@@ -6,7 +6,8 @@ from fabric.api import local, abort, settings, lcd, get, env, hosts, sudo, reboo
 from fabric.contrib.console import prompt
 from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, upload_template, put
-
+import os
+import pkg_resources
 
 env.use_ssh_config = True
 
@@ -86,7 +87,8 @@ def check_heroku():
     with settings(warn_only=True):
         response = local('heroku version')
     if response.failed:
-        abort('You have to install heroku first. Please, visit https://devcenter.heroku.com/articles/heroku-command-line')
+        abort(
+            'You have to install heroku first. Please, visit https://devcenter.heroku.com/articles/heroku-command-line')
     print('Heroku have been installed correct.\n')
 
 
@@ -138,8 +140,11 @@ def version():
     """
     Print hmara version.
     """
-    with open('/var/lib/vps_tools/VERSION', 'r') as version_file:
-        print('hmara version {}'.format(version_file.read()))
+    if os.path.isfile('vps_tools/VERSION'):
+        with open('vps_tools/VERSION', 'r') as version_file:
+            print('hmara version {}'.format(version_file.read()))
+    else:
+        print('hmara version {}'.format(pkg_resources.resource_string(__name__, 'VERSION')))
 
 
 def init_hmara_server():
@@ -147,4 +152,3 @@ def init_hmara_server():
     sudo('apt-get install -y postgresql python3.5-dev redis-server git mc htop python-pip python-setuptools awscli')
     sudo('apt-get build-dep -y python3-psycopg2 python-psycopg2 python-imaging')
     sudo('aws configure')
-

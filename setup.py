@@ -14,12 +14,14 @@ setup(
     author_email='vitaly.omelchuk@gmail.com',
     description='',
     data_files=[
-        ('/var/lib/vps_tools', [
+        ('vps_tools', [
             'vps_tools/templates/nginx.conf',
             'vps_tools/templates/supervisord.conf',
             'vps_tools/VERSION'
         ])
     ],
     install_requires=['fabric', 'botocore', 'dj_database_url'],
-    scripts=['hmara']
+    entry_points={
+        'console_scripts': ['hmara = vps_tools.hmara:main']
+    }
 )

@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-
+import os
 from StringIO import StringIO
 from time import sleep
 
@@ -7,10 +7,11 @@ from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import exists, upload_template, put, append
 import string
 import random
+import pkg_resources
 
 
 def id_generator(size=6, chars=string.ascii_lowercase):
-    return ''.join(random.choice(chars) for _ in range(size))
+    return ''.join(random.sample(chars, size))
 
 
 @task
@@ -76,30 +77,51 @@ def create(username, repo_url):
                 has_south = True
 
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
+        env_path = os.pathsep.join(['/home/{username}/venv/bin'.format(username=username),
+                                    '/usr/local/sbin',
+                                    '/usr/local/bin',
+                                    '/usr/sbin',
+                                    '/usr/bin',
+                                    '/sbin',
+                                    '/bin'])
         env = [
             'PORT={port_number}'.format(port_number=port_number),
             'DATABASE_URL={db_url}'.format(db_url=db_url),
-            'PATH=/home/{username}/venv/bin:{path}'.format(username=username, path=remote_path)
+            'PATH={path}'.format(path=env_path)
         ]
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
         if not exists('logs'):
             sudo('mkdir logs')
 
         with cd('{username}'.format(username=username)):
-            sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(username=username))
+            sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(
+                username=username))
             if should_sync:
-                sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(username=username))
+                sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(
+                    username=username))
                 if has_south:
-                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
+                        username=username))
             else:
-                sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(username=username))
+                sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
+                    username=username))
 
-    upload_template('/var/lib/vps_tools/nginx.conf', mode=0644, use_sudo=True, context=context,
+    if os.path.isfile('vps_tools/supervisord.conf'):
+        supervisord_config_filename = 'vps_tools/supervisord.conf'
+    else:
+        supervisord_config_filename = pkg_resources.resource_filename('vps_tools', 'supervisord.conf')
+    if os.path.isfile('vps_tools/nginx.conf'):
+        nginx_config_filename = 'vps_tools/nginx.conf'
+    else:
+        nginx_config_filename = pkg_resources.resource_filename('vps_tools', 'nginx.conf')
+
+    upload_template(nginx_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
     if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
-    upload_template('/var/lib/vps_tools/supervisord.conf', mode=0644, use_sudo=True, context=context,
+    upload_template(supervisord_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
+    pkg_resources.cleanup_resources()
     sudo('supervisorctl reload')
     return_code = 1
     with settings(warn_only=True):
@@ -116,6 +138,7 @@ def create(username, repo_url):
             print('Try to get nginx status')
             result = sudo('service nginx status')
             return_code = result.return_code
+
 
 @task
 def destroy(username):
@@ -158,7 +181,8 @@ def run(username, cmd):
     Run command on project environment. Usage: project.run:<username>,cmd='<command>'
     """
     home_folder = '/home/{username}'.format(username=username)
-    with cd('/home/{username}/{username}'.format(username=username)), settings(sudo_user=username), shell_env(HOME=home_folder):
+    with cd('/home/{username}/{username}'.format(username=username)), settings(sudo_user=username), shell_env(
+            HOME=home_folder):
         sudo('/home/{username}/venv/bin/honcho run {cmd}'.format(username=username, cmd=cmd))
 
 

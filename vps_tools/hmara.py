@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from __future__ import unicode_literals, print_function
 import argparse
+import tempfile
+import os
 from fabric.api import execute, prompt, env, local
 
 try:
@@ -18,7 +20,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
-                    filename='/tmp/hmara.log',
+                    filename=os.path.join(tempfile.gettempdir(), 'hmara.log'),
                     filemode='w')
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
@@ -28,14 +30,14 @@ logging.getLogger('').addHandler(console)
 
 env.use_ssh_config = True
 
+env.hosts = ['hotels']
+
 SQS_URL = 'https://sqs.us-east-1.amazonaws.com/455994469874/hmara'
 
 
 def execute_project(args):
     if args.host:
         env.hosts = args.host
-    else:
-        env.hosts = ['hotels']
     if not args.subcommand == 'list' and args.name is None:
         print('--name is required')
         return
@@ -67,8 +69,6 @@ def execute_project(args):
 def execute_config(args):
     if args.host:
         env.hosts = args.host
-    else:
-        env.hosts = ['hotels']
     if args.subcommand == 'list':
         execute(list, args.name)
     elif args.subcommand == 'set':
@@ -82,8 +82,6 @@ def execute_service(args):
     """
     if args.host:
         env.hosts = args.host
-    else:
-        env.hosts = ['hotels']
     if args.name == 'nginx':
         execute(nginx, args.service_command)
     elif args.name == 'postgresql':
@@ -94,8 +92,6 @@ def execute_pg(args):
     """Database commands."""
     if args.host:
         env.hosts = args.host
-    else:
-        env.hosts = ['hotels']
     if args.subcommand == 'dump':
         execute(dump, args.name)
     elif args.subcommand == 'restore':
@@ -120,7 +116,8 @@ def execute_domain(args):
 def default_command():
     print('Default')
 
-if __name__ == '__main__':
+
+def main():
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
     subparser = parser.add_subparsers(title='Available commands', help='List of available comands.')
@@ -165,3 +162,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args.func(args)
+
+
+if __name__ == '__main__':
+    main()
