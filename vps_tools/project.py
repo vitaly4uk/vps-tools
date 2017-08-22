@@ -109,11 +109,11 @@ def create(username, repo_url):
     if os.path.isfile('vps_tools/supervisord.conf'):
         supervisord_config_filename = 'vps_tools/supervisord.conf'
     else:
-        supervisord_config_filename = pkg_resources.resource_filename('vps-tools', 'supervisord.conf')
+        supervisord_config_filename = pkg_resources.resource_filename('vps_tools', 'supervisord.conf')
     if os.path.isfile('vps_tools/nginx.conf'):
         nginx_config_filename = 'vps_tools/nginx.conf'
     else:
-        nginx_config_filename = pkg_resources.resource_filename('vps-tools', 'nginx.conf')
+        nginx_config_filename = pkg_resources.resource_filename('vps_tools', 'nginx.conf')
 
     upload_template(nginx_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
