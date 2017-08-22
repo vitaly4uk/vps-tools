@@ -3,6 +3,8 @@ from __future__ import unicode_literals, print_function
 import argparse
 import tempfile
 import os
+
+import sys
 from fabric.api import execute, prompt, env, local
 
 try:
@@ -106,7 +108,10 @@ def execute_version(args):
 
 
 def execute_update(args):
-    local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+    if sys.platform == 'win32':
+        local('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+    else:
+        local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
 def execute_domain(args):
