@@ -77,13 +77,13 @@ def create(username, repo_url):
                 has_south = True
 
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
-        env_path = os.pathsep.join(['/home/{username}/venv/bin'.format(username=username),
-                                    '/usr/local/sbin',
-                                    '/usr/local/bin',
-                                    '/usr/sbin',
-                                    '/usr/bin',
-                                    '/sbin',
-                                    '/bin'])
+        env_path = ':'.join(['/home/{username}/venv/bin'.format(username=username),
+                             '/usr/local/sbin',
+                             '/usr/local/bin',
+                             '/usr/sbin',
+                             '/usr/bin',
+                             '/sbin',
+                             '/bin'])
         env = [
             'PORT={port_number}'.format(port_number=port_number),
             'DATABASE_URL={db_url}'.format(db_url=db_url),
