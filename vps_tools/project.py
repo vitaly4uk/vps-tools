@@ -8,7 +8,6 @@ from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import exists, upload_template, put, append
 import string
 import random
-import pkg_resources
 
 
 def id_generator(size=6, chars=string.ascii_lowercase):
@@ -122,7 +121,6 @@ def create(username, repo_url):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
     upload_template(supervisord_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
-    pkg_resources.cleanup_resources()
     sudo('supervisorctl reload')
     return_code = 1
     with settings(warn_only=True):
