@@ -7,7 +7,7 @@ from fabric.contrib.console import prompt
 from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, upload_template, put
 import os
-import pkg_resources
+import sys
 
 env.use_ssh_config = True
 
@@ -141,10 +141,11 @@ def version():
     Print hmara version.
     """
     if os.path.isfile('vps_tools/VERSION'):
-        with open('vps_tools/VERSION', 'r') as version_file:
-            print('hmara version {}'.format(version_file.read()))
+        version_file = 'vps_tools/VERSION'
     else:
-        print('hmara version {}'.format(pkg_resources.resource_string('vps_tools', 'VERSION')))
+        version_file = os.path.join(sys.prefix, 'vps_tools/VERSION')
+    with open(version_file, 'r') as version_file:
+        print('hmara version {}'.format(version_file.read()))
 
 
 def init_hmara_server():
