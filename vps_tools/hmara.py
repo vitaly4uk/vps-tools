@@ -3,7 +3,6 @@ from __future__ import unicode_literals, print_function
 import argparse
 import tempfile
 import os
-
 import sys
 from fabric.api import execute, prompt, env, local
 
@@ -47,7 +46,7 @@ def execute_project(args):
         repo_url = args.repo_url
         if repo_url is None:
             repo_url = prompt('Please, input repository url of project:')
-        execute(create, args.name, repo_url=repo_url)
+        execute(create, args.name, repo_url=repo_url, no_createdb=args.no_createdb, no_migrations=args.no_migrations)
     elif args.subcommand == 'destroy':
         execute(destroy, args.name)
     elif args.subcommand == 'run':
@@ -109,7 +108,7 @@ def execute_version(args):
 
 def execute_update(args):
     if sys.platform == 'win32':
-        local('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+        print('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
     else:
         local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
@@ -133,6 +132,8 @@ def main():
     parser_project.add_argument('--repo_url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
     parser_project.add_argument('--host', help='host name to run command on', nargs='+')
+    parser_project.add_argument('--no-createdb', help='do not create new database', action='store_true')
+    parser_project.add_argument('--no-migrations', help='do not apply migrations', action='store_true')
     parser_project.set_defaults(func=execute_project)
 
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')

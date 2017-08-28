@@ -15,7 +15,7 @@ def id_generator(size=6, chars=string.ascii_lowercase):
 
 
 @task
-def create(username, repo_url):
+def create(username, repo_url, no_createdb, no_migrations):
     """
     Create new project. Usage project.create:<username>,repo_url=<github_url>
     """
@@ -30,14 +30,18 @@ def create(username, repo_url):
 
     context = {
         'port': port_number,
-        'username': username,
-        'db_username': id_generator(12),
-        'db_password': id_generator(12),
     }
 
-    with settings(sudo_user='postgres'):
-        sudo('createdb {username}'.format(username=username))
-        sudo('psql -c "create user {db_username} with superuser password \'{db_password}\'"'.format(**context))
+    if not no_createdb:
+        context.update({
+            'username': username,
+            'db_username': id_generator(12),
+            'db_password': id_generator(12),
+        })
+        db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
+        with settings(sudo_user='postgres'):
+            sudo('createdb {username}'.format(username=username))
+            sudo('psql -c "create user {db_username} with superuser password \'{db_password}\'"'.format(**context))
 
     home_folder = '/home/{username}'.format(username=username)
     sudo('id -u {username} &>/dev/null || useradd --shell /bin/false {username}'.format(username=username))
@@ -76,7 +80,6 @@ def create(username, repo_url):
             if lib_name == 'South':
                 has_south = True
 
-        db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
         env_path = ':'.join(['/home/{username}/venv/bin'.format(username=username),
                              '/usr/local/sbin',
                              '/usr/local/bin',
@@ -86,25 +89,27 @@ def create(username, repo_url):
                              '/bin'])
         env = [
             'PORT={port_number}'.format(port_number=port_number),
-            'DATABASE_URL={db_url}'.format(db_url=db_url),
             'PATH={path}'.format(path=env_path)
         ]
+        if not no_createdb:
+            env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
         if not exists('logs'):
             sudo('mkdir logs')
 
-        with cd('{username}'.format(username=username)):
-            sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(
-                username=username))
-            if should_sync:
-                sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(
+        if not no_migrations:
+            with cd('{username}'.format(username=username)):
+                sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(
                     username=username))
-                if has_south:
+                if should_sync:
+                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(
+                        username=username))
+                    if has_south:
+                        sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
+                            username=username))
+                else:
                     sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
                         username=username))
-            else:
-                sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
-                    username=username))
 
     if os.path.isfile('vps_tools/supervisord.conf'):
         supervisord_config_filename = 'vps_tools/supervisord.conf'
