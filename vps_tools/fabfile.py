@@ -8,7 +8,7 @@ from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, upload_template, put
 import os
 import sys
-
+import pkg_resources
 env.use_ssh_config = True
 
 vagrant_file_content = """Vagrant.configure("2") do |config|
@@ -140,10 +140,13 @@ def version():
     """
     Print hmara version.
     """
-    if os.path.isfile('vps_tools/VERSION'):
-        version_file = 'vps_tools/VERSION'
+    if pkg_resources.resource_exists('vps_tools', 'VERSION'):
+        version_file = pkg_resources.resource_filename('vps_tools', 'VERSION')
     else:
-        version_file = os.path.join(sys.prefix, 'vps_tools/VERSION')
+        if os.path.isfile('./VERSION'):
+            version_file = './VERSION'
+        else:
+            version_file = os.path.join(sys.prefix, 'vps_tools', 'VERSION')
     with open(version_file, 'r') as version_file:
         print('hmara version {}'.format(version_file.read()))
 

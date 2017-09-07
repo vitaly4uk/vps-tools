@@ -12,7 +12,7 @@ except ImportError:
     from ConfigParser import RawConfigParser
 
 from vps_tools.fabfile import version
-from vps_tools.project import create, destroy, run, restart, list_projects
+from vps_tools.project import create, destroy, run, restart, list_projects, deploy
 from vps_tools.config import list, set
 from vps_tools.service import nginx, postgresql
 from vps_tools.pg import dump, restore
@@ -58,11 +58,7 @@ def execute_project(args):
     elif args.subcommand == 'restart':
         execute(restart, args.name)
     elif args.subcommand == 'deploy':
-        execute(run, args.name, 'git pull origin')
-        execute(run, args.name, 'pip install --upgrade -r requirements.txt')
-        execute(run, args.name, 'python ./manage.py collectstatic --noinput')
-        execute(run, args.name, 'python ./manage.py migrate --noinput')
-        execute(restart, args.name)
+        execute(deploy, args.name)
     else:
         execute(list_projects)
 
@@ -129,7 +125,7 @@ def main():
     parser_project = subparser.add_parser('project', help='#  Manage projects')
     parser_project.add_argument('subcommand', choices=['create', 'deploy', 'destroy', 'run', 'restart', 'list'])
     parser_project.add_argument('--name', help='project name')
-    parser_project.add_argument('--repo_url', help='git repository url with project')
+    parser_project.add_argument('--repo-url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
     parser_project.add_argument('--host', help='host name to run command on', nargs='+')
     parser_project.add_argument('--no-createdb', help='do not create new database', action='store_true')

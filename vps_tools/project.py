@@ -4,14 +4,34 @@ from StringIO import StringIO
 from time import sleep
 
 import sys
-from fabric.api import task, sudo, get, settings, shell_env, cd, hide
+from fabric.api import task, sudo, get, settings, shell_env, cd, hide, execute
 from fabric.contrib.files import exists, upload_template, put, append
 import string
 import random
+import pkg_resources
 
 
 def id_generator(size=6, chars=string.ascii_lowercase):
     return ''.join(random.sample(chars, size))
+
+
+def get_resource_path(file_name):
+    if pkg_resources.resource_exists('vps_tools', file_name):
+        file_path = pkg_resources.resource_filename('vps_tools', file_name)
+    else:
+        if os.path.isfile(os.path.join('templates', file_name)):
+            file_path = os.path.join('templates', file_name)
+        else:
+            file_path = os.path.join(sys.prefix, 'vps_tools', file_name)
+    return file_path
+
+def run_untile_ok(cmd):
+    return_code = 1
+    with settings(warn_only=True):
+        while not return_code == 0:
+            sleep(3)
+            result = sudo(cmd)
+            return_code = result.return_code    
 
 
 @task
@@ -54,39 +74,47 @@ def create(username, repo_url, no_createdb, no_migrations):
             sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
         if not exists('./venv', use_sudo=True):
             runtime_file = StringIO()
-            get('/home/{username}/{username}/runtime.txt'.format(username=username), runtime_file)
-            runtime = runtime_file.getvalue()[:10]
+            runtime = 'python-3.5'
+            if exists('/home/{username}/{username}/runtime.txt'.format(username=username)):
+                get('/home/{username}/{username}/runtime.txt'.format(username=username), runtime_file)
+                runtime = runtime_file.getvalue()[:10]
             if runtime == 'python-2.7':
                 sudo('virtualenv venv')
             elif runtime == 'python-3.5':
                 sudo('virtualenv venv --python=/usr/bin/python3.5')
 
         sudo('./venv/bin/pip install --upgrade pip', pty=False)
-        sudo('./venv/bin/pip install honcho[export]', pty=False)
-        sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
+        sudo('./venv/bin/pip install honcho[export]', pty=False)            
+        if exists('/home/{username}/{username}/requirements.txt'.format(username=username)):
+            sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
 
-        should_sync = False
-        has_south = False
-        requirements_file = StringIO()
-        get('/home/{username}/{username}/requirements.txt'.format(username=username), requirements_file)
-        for line in requirements_file.getvalue().split():
-            if '==' not in line:
-                continue
-            lib_name, lib_version = line.split('==')
-            if lib_name == 'Django':
-                v1, v2, v3 = lib_version.split('.')
-                if int(v2) < 7:
-                    should_sync = True
-            if lib_name == 'South':
-                has_south = True
+            should_sync = False
+            has_south = False
+            requirements_file = StringIO()
+            get('/home/{username}/{username}/requirements.txt'.format(username=username), requirements_file)
+            for line in requirements_file.getvalue().split():
+                if '==' not in line:
+                    continue
+                lib_name, lib_version = line.split('==')
+                if lib_name == 'Django':
+                    v1, v2, v3 = lib_version.split('.')
+                    if int(v2) < 7:
+                        should_sync = True
+                if lib_name == 'South':
+                    has_south = True
 
-        env_path = ':'.join(['/home/{username}/venv/bin'.format(username=username),
-                             '/usr/local/sbin',
-                             '/usr/local/bin',
-                             '/usr/sbin',
-                             '/usr/bin',
-                             '/sbin',
-                             '/bin'])
+            env_path = '/home/{username}/venv/bin:'.format(username=username)
+        elif exists('/home/{username}/{username}/package.json'.format(username=username)):
+            with cd('/home/{username}/{username}/'.format(username=username)):
+                sudo('npm install')
+            env_path = '/home/{username}/{username}/node_modules/.bin:'.format(username=username)
+
+        env_path += ':'.join(['/usr/local/sbin',
+                              '/usr/local/bin',
+                              '/usr/sbin',
+                              '/usr/bin',
+                              '/sbin',
+                              '/bin'])
         env = [
             'PORT={port_number}'.format(port_number=port_number),
             'PATH={path}'.format(path=env_path)
@@ -97,7 +125,7 @@ def create(username, repo_url, no_createdb, no_migrations):
         if not exists('logs'):
             sudo('mkdir logs')
 
-        if not no_migrations:
+        if exists('requirements.txt') and not no_migrations:
             with cd('{username}'.format(username=username)):
                 sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(
                     username=username))
@@ -110,15 +138,9 @@ def create(username, repo_url, no_createdb, no_migrations):
                 else:
                     sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
                         username=username))
-
-    if os.path.isfile('vps_tools/supervisord.conf'):
-        supervisord_config_filename = 'vps_tools/supervisord.conf'
-    else:
-        supervisord_config_filename = os.path.join(sys.prefix, 'vps_tools', 'supervisord.conf')
-    if os.path.isfile('vps_tools/nginx.conf'):
-        nginx_config_filename = 'vps_tools/nginx.conf'
-    else:
-        nginx_config_filename = os.path.join(sys.prefix, 'vps_tools', 'nginx.conf')
+   
+    supervisord_config_filename = get_resource_path('supervisord.conf')
+    nginx_config_filename = get_resource_path('nginx.conf')
 
     upload_template(nginx_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/nginx/sites-available/{username}'.format(username=username))
@@ -127,21 +149,10 @@ def create(username, repo_url, no_createdb, no_migrations):
     upload_template(supervisord_config_filename, mode=0644, use_sudo=True, context=context,
                     destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
     sudo('supervisorctl reload')
-    return_code = 1
-    with settings(warn_only=True):
-        while not return_code == 0:
-            sleep(3)
-            print('Try to get supervisor status')
-            result = sudo('supervisorctl status')
-            return_code = result.return_code
+    run_untile_ok('supervisorctl status')
+
     sudo('service nginx reload')
-    return_code = 1
-    with settings(warn_only=True):
-        while not return_code == 0:
-            sleep(3)
-            print('Try to get nginx status')
-            result = sudo('service nginx status')
-            return_code = result.return_code
+    run_untile_ok('service nginx status')
 
 
 @task
@@ -155,28 +166,33 @@ def destroy(username):
         sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
         sudo('supervisorctl reload')
-        return_code = 1
-        with settings(warn_only=True):
-            while not return_code == 0:
-                sleep(3)
-                print('Try to get supervisor status')
-                result = sudo('supervisorctl status')
-                return_code = result.return_code
+        run_untile_ok('supervisorctl status')
+
     if exists('/var/log/{username}'.format(username=username)):
         sudo('rm -rf /var/log/{username}'.format(username=username))
     if exists(nginx_file_name):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
-        return_code = 1
-        with settings(warn_only=True):
-            while not return_code == 0:
-                sleep(3)
-                print('Try to get nginx status')
-                result = sudo('service nginx status')
-                return_code = result.return_code
+        run_untile_ok('service nginx status')
+
     with settings(sudo_user='postgres'):
         sudo('dropdb --if-exists {username}'.format(username=username))
     sudo('deluser --remove-home {}'.format(username))
+
+@task
+def deploy(username):
+    home_folder = '/home/{username}'.format(username=username)
+    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
+        with cd('/home/{username}/{username}/'.format(username=username)):
+            sudo('git pull origin')
+        if exists('/home/{username}/{username}/requirements.txt'.format(username=username)):
+            sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
+            execute(run, username, 'python ./manage.py collectstatic --noinput')
+            execute(run, username, 'python ./manage.py migrate --noinput')
+        elif exists('/home/{username}/{username}/package.json'.format(username=username)):
+            with cd('/home/{username}/{username}/'.format(username=username)):
+                sudo('npm install')            
+    execute(restart, username)
 
 
 @task
