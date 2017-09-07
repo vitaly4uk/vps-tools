@@ -11,65 +11,6 @@ import sys
 import pkg_resources
 env.use_ssh_config = True
 
-vagrant_file_content = """Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/trusty64"
-  config.vm.network "forwarded_port", guest: 8000, host: 8000
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "512"
-  end
-    config.vm.provision "shell" do |s|
-    s.inline = <<-SHELL
-        set -euo pipefail
-        IFS=$'\n\t'
-        set +H
-        sudo apt-get install python-software-properties
-        if [ ! -f /etc/apt/sources.list.d/fkrull-deadsnakes-trusty.list ]
-        then
-            sudo apt-add-repository ppa:fkrull/deadsnakes
-        fi
-        if [ ! -f /etc/apt/sources.list.d/fkrull-deadsnakes-python2_7-trusty.list ]
-        then
-            sudo apt-add-repository ppa:fkrull/deadsnakes-python2.7
-        fi
-        if [ ! -f /etc/apt/sources.list.d/pgdg.list ]
-        then
-            sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ trusty-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-            wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        fi
-        sudo apt-get update
-        sudo apt-get upgrade -y
-        sudo apt-get install -y postgresql redis-server git mc htop python-pip python-setuptools
-        sudo apt-get build-dep -y python-psycopg2 python-imaging
-        sudo pip install fabric
-        if [ "$(sudo -u postgres psql -l | grep vagrant | head -n 1 | awk '{print $1}')" != "vagrant" ]
-        then
-            printf "Create DB vagrant with user vagrant"
-            sudo -u postgres createdb vagrant
-            set +e
-            sudo -u postgres psql -c "create user vagrant with superuser password 'vagrant'"
-            if [ $? -ne 0 ]
-            then
-                sudo -u postgres psql -c "alter user vagrant with superuser password 'vagrant'"
-            fi
-            set -e
-        fi
-        cd /vagrant
-        if [ ! -f ./fabfile.py ]
-        then
-            wget -q https://raw.githubusercontent.com/vitaly4uk/vps_tools/master/fabfile.py
-        fi
-        if [ ! -f ./manage.py ]
-        then
-            fab clone_project_template
-        fi
-        fab install_requirements
-        honcho run python ./manage.py migrate
-        honcho run python ./manage.py createsuperuser
-      SHELL
-    s.privileged = false
-  end
-end
-"""
 
 
 def set_runtime():
@@ -141,14 +82,16 @@ def version():
     Print hmara version.
     """
     if pkg_resources.resource_exists('vps_tools', 'VERSION'):
-        version_file = pkg_resources.resource_filename('vps_tools', 'VERSION')
+        version_path = pkg_resources.resource_filename('vps_tools', 'VERSION')
     else:
         if os.path.isfile('./VERSION'):
-            version_file = './VERSION'
+            version_path = './VERSION'
         else:
-            version_file = os.path.join(sys.prefix, 'vps_tools', 'VERSION')
-    with open(version_file, 'r') as version_file:
+            version_path = os.path.join(sys.prefix, 'vps_tools', 'VERSION')
+    print(version_path)
+    with open(version_path, 'r') as version_file:
         print('hmara version {}'.format(version_file.read()))
+    pkg_resources.cleanup_resources()
 
 
 def init_hmara_server():
