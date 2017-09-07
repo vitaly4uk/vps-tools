@@ -46,7 +46,8 @@ def execute_project(args):
         repo_url = args.repo_url
         if repo_url is None:
             repo_url = prompt('Please, input repository url of project:')
-        execute(create, args.name, repo_url=repo_url, no_createdb=args.no_createdb, no_migrations=args.no_migrations)
+        execute(create, args.name, repo_url=repo_url, no_createdb=args.no_createdb,
+                no_migrations=args.no_migrations, base_domain=args.base_domain)
     elif args.subcommand == 'destroy':
         execute(destroy, args.name)
     elif args.subcommand == 'run':
@@ -113,10 +114,6 @@ def execute_domain(args):
     pass
 
 
-def default_command():
-    print('Default')
-
-
 def main():
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
@@ -127,9 +124,10 @@ def main():
     parser_project.add_argument('--name', help='project name')
     parser_project.add_argument('--repo-url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
-    parser_project.add_argument('--host', help='host name to run command on', nargs='+')
+    parser_project.add_argument('--host', help='host name to run command on', nargs='+', default='hotels')
     parser_project.add_argument('--no-createdb', help='do not create new database', action='store_true')
     parser_project.add_argument('--no-migrations', help='do not apply migrations', action='store_true')
+    parser_project.add_argument('--base-domain', help='base domain.', default='nomax.com.ua')
     parser_project.set_defaults(func=execute_project)
 
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')

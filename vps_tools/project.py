@@ -1,29 +1,43 @@
-from __future__ import unicode_literals
-import os
+from __future__ import unicode_literals, print_function
+
 from StringIO import StringIO
 from time import sleep
 
-import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide, execute
-from fabric.contrib.files import exists, upload_template, put, append
+from fabric.contrib.files import exists, put, append
 import string
 import random
-import pkg_resources
+
+
+nginx_config = """server {{
+    listen 80;
+    server_name {username}.{base_domain};
+
+    location / {{
+        include /etc/nginx/proxy_params;
+        proxy_pass http://127.0.0.1:{port};
+        access_log /home/{username}/logs/access.log;
+        error_log /home/{username}/logs/error.log error;        
+    }}
+}}
+"""
+
+supervisor_config = """[program:{username}]
+command=/home/{username}/venv/bin/honcho start
+autostart=true
+autorestart=true
+stopasgroup=true
+stdout_logfile=/home/{username}/logs/stdout.log
+stderr_logfile=/home/{username}/logs/stderr.log
+user={username}
+directory=/home/{username}/{username}
+environment=PATH="/home/{username}/venv/bin:{ENV_PATH}"
+"""
 
 
 def id_generator(size=6, chars=string.ascii_lowercase):
     return ''.join(random.sample(chars, size))
 
-
-def get_resource_path(file_name):
-    if pkg_resources.resource_exists('vps_tools', file_name):
-        file_path = pkg_resources.resource_filename('vps_tools', file_name)
-    else:
-        if os.path.isfile(os.path.join('templates', file_name)):
-            file_path = os.path.join('templates', file_name)
-        else:
-            file_path = os.path.join(sys.prefix, 'vps_tools', file_name)
-    return file_path
 
 def run_untile_ok(cmd):
     return_code = 1
@@ -31,11 +45,11 @@ def run_untile_ok(cmd):
         while not return_code == 0:
             sleep(3)
             result = sudo(cmd)
-            return_code = result.return_code    
+            return_code = result.return_code
 
 
 @task
-def create(username, repo_url, no_createdb, no_migrations):
+def create(username, repo_url, no_createdb, no_migrations, base_domain):
     """
     Create new project. Usage project.create:<username>,repo_url=<github_url>
     """
@@ -50,11 +64,12 @@ def create(username, repo_url, no_createdb, no_migrations):
 
     context = {
         'port': port_number,
+        'base_domain': base_domain,
+        'username': username,
     }
 
     if not no_createdb:
         context.update({
-            'username': username,
             'db_username': id_generator(12),
             'db_password': id_generator(12),
         })
@@ -84,7 +99,7 @@ def create(username, repo_url, no_createdb, no_migrations):
                 sudo('virtualenv venv --python=/usr/bin/python3.5')
 
         sudo('./venv/bin/pip install --upgrade pip', pty=False)
-        sudo('./venv/bin/pip install honcho[export]', pty=False)            
+        sudo('./venv/bin/pip install honcho[export]', pty=False)
         if exists('/home/{username}/{username}/requirements.txt'.format(username=username)):
             sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
 
@@ -138,16 +153,15 @@ def create(username, repo_url, no_createdb, no_migrations):
                 else:
                     sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
                         username=username))
-   
-    supervisord_config_filename = get_resource_path('supervisord.conf')
-    nginx_config_filename = get_resource_path('nginx.conf')
 
-    upload_template(nginx_config_filename, mode=0644, use_sudo=True, context=context,
-                    destination='/etc/nginx/sites-available/{username}'.format(username=username))
+    print(context)
+    nginx_content = nginx_config.format(**context)
+    supervisor_content = supervisor_config.format(**context)
+    put(local_path=StringIO(nginx_content), remote_path='/etc/nginx/sites-available/{username}'.format(username=username), use_sudo=True)
+    put(local_path=StringIO(supervisor_content), remote_path='/etc/supervisor/conf.d/{username}.conf'.format(username=username), use_sudo=True)
     if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
-    upload_template(supervisord_config_filename, mode=0644, use_sudo=True, context=context,
-                    destination='/etc/supervisor/conf.d/{username}.conf'.format(username=username))
+
     sudo('supervisorctl reload')
     run_untile_ok('supervisorctl status')
 
@@ -179,6 +193,7 @@ def destroy(username):
         sudo('dropdb --if-exists {username}'.format(username=username))
     sudo('deluser --remove-home {}'.format(username))
 
+
 @task
 def deploy(username):
     home_folder = '/home/{username}'.format(username=username)
@@ -191,7 +206,7 @@ def deploy(username):
             execute(run, username, 'python ./manage.py migrate --noinput')
         elif exists('/home/{username}/{username}/package.json'.format(username=username)):
             with cd('/home/{username}/{username}/'.format(username=username)):
-                sudo('npm install')            
+                sudo('npm install')
     execute(restart, username)
 
 
@@ -225,4 +240,4 @@ def list_projects():
     for i in result.splitlines():
         if i == 'ubuntu':
             continue
-        print i
+        print(i)
