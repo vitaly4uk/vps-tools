@@ -23,7 +23,7 @@ nginx_config = """server {{
 """
 
 supervisor_config = """[program:{username}]
-command=/home/{username}/venv/bin/honcho start
+command=forego start
 autostart=true
 autorestart=true
 stopasgroup=true
@@ -31,7 +31,7 @@ stdout_logfile=/home/{username}/logs/stdout.log
 stderr_logfile=/home/{username}/logs/stderr.log
 user={username}
 directory=/home/{username}/{username}
-environment=PATH="/home/{username}/venv/bin:{ENV_PATH}"
+environment=PATH="{PATH}"
 """
 
 
@@ -39,7 +39,7 @@ def id_generator(size=6, chars=string.ascii_lowercase):
     return ''.join(random.sample(chars, size))
 
 
-def run_untile_ok(cmd):
+def run_until_ok(cmd):
     return_code = 1
     with settings(warn_only=True):
         while not return_code == 0:
@@ -48,19 +48,30 @@ def run_untile_ok(cmd):
             return_code = result.return_code
 
 
-@task
-def create(username, repo_url, no_createdb, no_migrations, base_domain):
-    """
-    Create new project. Usage project.create:<username>,repo_url=<github_url>
-    """
+def get_port_number():
     if exists('.port_number'):
         port_number_file = StringIO()
         get('.port_number', port_number_file)
         port_number = port_number_file.getvalue()
     else:
         port_number = "8010"
-    port_number = int(port_number) + 1
+    return int(port_number) + 1
+
+
+@task
+def create(username, repo_url, no_createdb, no_migrations, base_domain):
+    """
+    Create new project. Usage project.create:<username>,repo_url=<github_url>
+    """
+    port_number = get_port_number()
     put(StringIO(str(port_number)), '.port_number')
+
+    env_path = ':'.join(['/usr/local/sbin',
+                         '/usr/local/bin',
+                         '/usr/sbin',
+                         '/usr/bin',
+                         '/sbin',
+                         '/bin'])
 
     context = {
         'port': port_number,
@@ -83,24 +94,23 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
     if not exists(home_folder):
         sudo('mkhomedir_helper {username}'.format(username=username))
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
-        remote_path = sudo('echo $PATH')
-        context.update({'ENV_PATH': remote_path})
+
         if not exists('./{username}'.format(username=username), use_sudo=True):
             sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
-        if not exists('./venv', use_sudo=True):
-            runtime_file = StringIO()
-            runtime = 'python-3.5'
-            if exists('/home/{username}/{username}/runtime.txt'.format(username=username)):
-                get('/home/{username}/{username}/runtime.txt'.format(username=username), runtime_file)
-                runtime = runtime_file.getvalue()[:10]
-            if runtime == 'python-2.7':
-                sudo('virtualenv venv')
-            elif runtime == 'python-3.5':
-                sudo('virtualenv venv --python=/usr/bin/python3.5')
 
-        sudo('./venv/bin/pip install --upgrade pip', pty=False)
-        sudo('./venv/bin/pip install honcho[export]', pty=False)
         if exists('/home/{username}/{username}/requirements.txt'.format(username=username)):
+            if not exists('./venv', use_sudo=True):
+                runtime_file = StringIO()
+                runtime = 'python-3.5'
+                if exists('/home/{username}/{username}/runtime.txt'.format(username=username)):
+                    get('/home/{username}/{username}/runtime.txt'.format(username=username), runtime_file)
+                    runtime = runtime_file.getvalue()[:10]
+                if runtime == 'python-2.7':
+                    sudo('virtualenv venv')
+                elif runtime == 'python-3.5':
+                    sudo('virtualenv venv --python=/usr/bin/python3.5')
+
+            sudo('./venv/bin/pip install --upgrade pip', pty=False)
             sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
 
             should_sync = False
@@ -118,18 +128,12 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
                 if lib_name == 'South':
                     has_south = True
 
-            env_path = '/home/{username}/venv/bin:'.format(username=username)
+            env_path = '/home/{username}/venv/bin:'.format(username=username) + env_path
         elif exists('/home/{username}/{username}/package.json'.format(username=username)):
             with cd('/home/{username}/{username}/'.format(username=username)):
                 sudo('npm install')
-            env_path = '/home/{username}/{username}/node_modules/.bin:'.format(username=username)
+            env_path = '/home/{username}/{username}/node_modules/.bin:'.format(username=username) + env_path
 
-        env_path += ':'.join(['/usr/local/sbin',
-                              '/usr/local/bin',
-                              '/usr/sbin',
-                              '/usr/bin',
-                              '/sbin',
-                              '/bin'])
         env = [
             'PORT={port_number}'.format(port_number=port_number),
             'PATH={path}'.format(path=env_path)
@@ -140,21 +144,16 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
         if not exists('logs'):
             sudo('mkdir logs')
 
-        if exists('requirements.txt') and not no_migrations:
-            with cd('{username}'.format(username=username)):
-                sudo('/home/{username}/venv/bin/honcho run python ./manage.py collectstatic --noinput'.format(
-                    username=username))
-                if should_sync:
-                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py syncdb --noinput'.format(
-                        username=username))
-                    if has_south:
-                        sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
-                            username=username))
-                else:
-                    sudo('/home/{username}/venv/bin/honcho run python ./manage.py migrate --noinput'.format(
-                        username=username))
+        if exists('/home/{username}/{username}/requirements.txt'.format(username=username)) and not no_migrations:
+            execute(run, username, 'python manage.py collectstatic --noinput')
+            if should_sync:
+                execute(run, username, 'python manage.py syncdb --noinput')
+                if has_south:
+                    execute(run, username, 'python manage.py migrate --noinput')
+            else:
+                execute(run, username, 'python manage.py migrate --noinput')
 
-    print(context)
+    context.update({'PATH': env_path})
     nginx_content = nginx_config.format(**context)
     supervisor_content = supervisor_config.format(**context)
     put(local_path=StringIO(nginx_content), remote_path='/etc/nginx/sites-available/{username}'.format(username=username), use_sudo=True)
@@ -163,10 +162,10 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
         sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
 
     sudo('supervisorctl reload')
-    run_untile_ok('supervisorctl status')
+    run_until_ok('supervisorctl status')
 
     sudo('service nginx reload')
-    run_untile_ok('service nginx status')
+    run_until_ok('service nginx status')
 
 
 @task
@@ -180,14 +179,14 @@ def destroy(username):
         sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
         sudo('supervisorctl reload')
-        run_untile_ok('supervisorctl status')
+        run_until_ok('supervisorctl status')
 
     if exists('/var/log/{username}'.format(username=username)):
         sudo('rm -rf /var/log/{username}'.format(username=username))
     if exists(nginx_file_name):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
-        run_untile_ok('service nginx status')
+        run_until_ok('service nginx status')
 
     with settings(sudo_user='postgres'):
         sudo('dropdb --if-exists {username}'.format(username=username))
@@ -202,8 +201,8 @@ def deploy(username):
             sudo('git pull origin')
         if exists('/home/{username}/{username}/requirements.txt'.format(username=username)):
             sudo('./venv/bin/pip install -r ./{username}/requirements.txt'.format(username=username), pty=False)
-            execute(run, username, 'python ./manage.py collectstatic --noinput')
-            execute(run, username, 'python ./manage.py migrate --noinput')
+            execute(run, username, 'python manage.py collectstatic --noinput')
+            execute(run, username, 'python manage.py migrate --noinput')
         elif exists('/home/{username}/{username}/package.json'.format(username=username)):
             with cd('/home/{username}/{username}/'.format(username=username)):
                 sudo('npm install')
@@ -216,9 +215,9 @@ def run(username, cmd):
     Run command on project environment. Usage: project.run:<username>,cmd='<command>'
     """
     home_folder = '/home/{username}'.format(username=username)
-    with cd('/home/{username}/{username}'.format(username=username)), settings(sudo_user=username), shell_env(
-            HOME=home_folder):
-        sudo('/home/{username}/venv/bin/honcho run {cmd}'.format(username=username, cmd=cmd))
+    project_folder = '/home/{username}/{username}'.format(username=username)
+    with cd(project_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
+        sudo('forego run {cmd}'.format(cmd=cmd))
 
 
 @task

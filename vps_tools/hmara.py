@@ -11,7 +11,6 @@ try:
 except ImportError:
     from ConfigParser import RawConfigParser
 
-from vps_tools.fabfile import version
 from vps_tools.project import create, destroy, run, restart, list_projects, deploy
 from vps_tools.config import list, set
 from vps_tools.service import nginx, postgresql
@@ -34,6 +33,8 @@ env.use_ssh_config = True
 env.hosts = ['hotels']
 
 SQS_URL = 'https://sqs.us-east-1.amazonaws.com/455994469874/hmara'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def execute_project(args):
@@ -100,7 +101,9 @@ def execute_version(args):
     """
     Show version
     """
-    execute(version)
+    with open(os.path.join(BASE_DIR, '__init__.py'), 'r') as version_file:
+        _, version = version_file.read().split("=")
+    print('hmara version: {}'.format(version[1:-1]))
 
 
 def execute_update(args):
