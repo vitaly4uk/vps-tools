@@ -36,7 +36,7 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
         env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         with settings(sudo_user='postgres'), StreamFilter([db_kwargs['db_password']], sys.stdout):
             sudo('psql -c "create user {db_username} with password \'{db_password}\'"'.format(**db_kwargs))
-            sudo('createdb {username} -O {username}'.format(username=username))
+            sudo('createdb {username} -O {db_username}'.format(**db_kwargs))
 
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
         if not exists('./{username}'.format(username=username), use_sudo=True):
