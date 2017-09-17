@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 from __future__ import unicode_literals, print_function
 import argparse
 import tempfile
@@ -68,7 +67,8 @@ def execute_config(args):
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, kwars)
     elif args.subcommand == 'unset':
-        execute(unset, args.name, args.vars)
+        kwars = [i.split('=')[0] for i in args.vars]
+        execute(unset, args.name, kwars)
 
 
 def execute_service(args):
