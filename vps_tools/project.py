@@ -165,7 +165,6 @@ def restart(project_name):
     """
     Restart project. Usage: project.restart:<username>
     """
-    config_nginx(project_name=project_name)
     sudo('supervisorctl restart {project_name}'.format(project_name=project_name))
     run_until_ok('supervisorctl status')
 

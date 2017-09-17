@@ -5,6 +5,8 @@ from StringIO import StringIO
 from time import sleep
 
 from collections import Iterable
+
+import sys
 from fabric.context_managers import settings, cd, shell_env
 from fabric.contrib.files import exists
 from fabric.operations import sudo, get, put
@@ -137,6 +139,12 @@ class StreamFilter(object):
 
     def flush(self):
         self.stream.flush()
+
+    def __enter__(self):
+        sys.stdout = self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        sys.stdout = self.stream
 
 
 def load_environment_dict(username):
