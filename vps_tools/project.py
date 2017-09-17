@@ -42,8 +42,8 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
         if not exists('./{username}'.format(username=project_name), use_sudo=True):
             sudo('git clone -q {repo_url} {username}'.format(username=project_name, repo_url=repo_url))
 
-    with StreamFilter([db_kwargs['db_password']], sys.stdout):
-        append('/home/{username}/{username}/.env'.format(username=project_name), env, use_sudo=True)
+        with StreamFilter([db_kwargs['db_password']], sys.stdout):
+            append('/home/{username}/{username}/.env'.format(username=project_name), env, use_sudo=True)
 
     config_supervisor(project_name=project_name)
     execute(deploy, project_name)
