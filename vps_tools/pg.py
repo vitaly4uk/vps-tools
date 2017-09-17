@@ -16,6 +16,7 @@ def dump(username, dump):
     home_folder = '/home/{username}'.format(username=username)
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
         with hide('output'):
+            sys.stdout = StreamFilter([database['PASSWORD']], sys.stdout)
             sudo('PGPASSWORD={PASSWORD} pg_dump -Fc --no-acl --no-owner -h localhost -U {USER} {NAME} > latest.dump'.format(**database))
         get('latest.dump', dump, temp_dir='/tmp')
 

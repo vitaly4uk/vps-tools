@@ -1,10 +1,12 @@
 from __future__ import unicode_literals, print_function
 
 from StringIO import StringIO
+
+import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide, execute
 from fabric.contrib.files import exists, put, append
 
-from vps_tools.utils import nginx_config, supervisor_config, id_generator, run_until_ok, get_port_number
+from vps_tools.utils import nginx_config, supervisor_config, id_generator, run_until_ok, get_port_number, StreamFilter
 
 
 @task
@@ -34,6 +36,7 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
             'db_password': id_generator(12),
         })
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**context)
+        sys.stdout = StreamFilter([context['db_password']], sys.stdout)
         with settings(sudo_user='postgres'):
             sudo('createdb {username}'.format(username=username))
             sudo('psql -c "create user {db_username} with superuser password \'{db_password}\'"'.format(**context))
