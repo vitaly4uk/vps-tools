@@ -6,16 +6,16 @@ import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide, execute
 from fabric.contrib.files import exists, put, append
 
-from vps_tools.utils import nginx_config, supervisor_config, id_generator, run_until_ok, get_port_number, StreamFilter
+from vps_tools.utils import id_generator, run_until_ok, get_port_number, StreamFilter, add_domain, config_nginx, \
+    config_supervisor, create_home_folder, create_logs_folder
 
 
-@task
+@task()
 def create(username, repo_url, no_createdb, no_migrations, base_domain):
     """
     Create new project. Usage project.create:<username>,repo_url=<github_url>
     """
     port_number = get_port_number()
-    put(StringIO(str(port_number)), '.port_number')
 
     env_path = ':'.join(['/usr/local/sbin',
                          '/usr/local/bin',
@@ -26,7 +26,6 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
 
     context = {
         'port': port_number,
-        'base_domain': base_domain,
         'username': username,
     }
 
@@ -42,11 +41,11 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
             sudo('psql -c "create user {db_username} with superuser password \'{db_password}\'"'.format(**context))
 
     home_folder = '/home/{username}'.format(username=username)
-    sudo('id -u {username} &>/dev/null || useradd --shell /bin/false {username}'.format(username=username))
-    if not exists(home_folder):
-        sudo('mkhomedir_helper {username}'.format(username=username))
+    create_home_folder(project_name=username)
+    create_logs_folder(project_name=username)
+    add_domain(project_name=username,
+               domain='{project_name}.{base_domain}'.format(project_name=username, base_domain=base_domain))
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
-
         if not exists('./{username}'.format(username=username), use_sudo=True):
             sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
 
@@ -93,8 +92,6 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
         if not no_createdb:
             env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
-        if not exists('logs'):
-            sudo('mkdir logs')
 
         if exists('/home/{username}/{username}/requirements.txt'.format(username=username)) and not no_migrations:
             execute(run, username, 'python manage.py collectstatic --noinput')
@@ -105,28 +102,21 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
             else:
                 execute(run, username, 'python manage.py migrate --noinput')
 
-    context.update({'PATH': env_path})
-    nginx_content = nginx_config.format(**context)
-    supervisor_content = supervisor_config.format(**context)
-    put(local_path=StringIO(nginx_content), remote_path='/etc/nginx/sites-available/{username}'.format(username=username), use_sudo=True)
-    put(local_path=StringIO(supervisor_content), remote_path='/etc/supervisor/conf.d/{username}.conf'.format(username=username), use_sudo=True)
-    if not exists('/etc/nginx/sites-enabled/{username}'.format(username=username)):
-        sudo('ln -s /etc/nginx/sites-available/{username} /etc/nginx/sites-enabled/'.format(username=username))
-
-    sudo('supervisorctl reload')
-    run_until_ok('supervisorctl status')
-
-    sudo('service nginx reload')
-    run_until_ok('service nginx status')
+    config_supervisor(project_name=username)
+    config_nginx(project_name=username)
 
 
-@task
+@task()
 def destroy(username):
     """
     Destroy project. Delete all data and config files. Usage: project.destroy:<username>
     """
     supervisor_file_name = '/etc/supervisor/conf.d/{username}.conf'.format(username=username)
     nginx_file_name = '/etc/nginx/sites-enabled/{username}'.format(username=username)
+    if exists(nginx_file_name):
+        sudo('rm -rf {}'.format(nginx_file_name))
+        sudo('service nginx reload')
+        run_until_ok('service nginx status')
     if exists(supervisor_file_name):
         sudo('supervisorctl stop {username}'.format(username=username))
         sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
@@ -135,17 +125,13 @@ def destroy(username):
 
     if exists('/var/log/{username}'.format(username=username)):
         sudo('rm -rf /var/log/{username}'.format(username=username))
-    if exists(nginx_file_name):
-        sudo('rm -rf {}'.format(nginx_file_name))
-        sudo('service nginx reload')
-        run_until_ok('service nginx status')
 
     with settings(sudo_user='postgres'):
         sudo('dropdb --if-exists {username}'.format(username=username))
     sudo('deluser --remove-home {}'.format(username))
 
 
-@task
+@task()
 def deploy(username):
     home_folder = '/home/{username}'.format(username=username)
     with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
@@ -161,7 +147,7 @@ def deploy(username):
     execute(restart, username)
 
 
-@task
+@task()
 def run(username, cmd):
     """
     Run command on project environment. Usage: project.run:<username>,cmd='<command>'
@@ -172,16 +158,17 @@ def run(username, cmd):
         sudo('forego run {cmd}'.format(cmd=cmd))
 
 
-@task
-def restart(username):
+@task()
+def restart(project_name):
     """
     Restart project. Usage: project.restart:<username>
     """
-    sudo('supervisorctl restart {username}'.format(username=username))
+    config_nginx(project_name=project_name)
+    sudo('supervisorctl restart {project_name}'.format(project_name=project_name))
     run_until_ok('supervisorctl status')
 
 
-@task
+@task()
 def list_projects():
     """
     Return list of projects

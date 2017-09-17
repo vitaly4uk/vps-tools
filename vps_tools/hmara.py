@@ -3,7 +3,10 @@ import argparse
 import tempfile
 import os
 import sys
+import git
 from fabric.api import execute, prompt, env, local
+
+from vps_tools.utils import load_domain_list, add_domain, remove_domain, config_nginx
 
 try:
     from configparser import RawConfigParser
@@ -40,7 +43,11 @@ def execute_project(args):
     if args.subcommand == 'create':
         repo_url = args.repo_url
         if repo_url is None:
-            repo_url = prompt('Please, input repository url of project:')
+            repo = git.Repo('.')
+            if repo.remotes.origin.url:
+                repo_url = repo.remotes.origin.url
+            else:
+                repo_url = prompt('Please, input repository url of project:')
         execute(create, args.name, repo_url=repo_url, no_createdb=args.no_createdb,
                 no_migrations=args.no_migrations, base_domain=args.base_domain)
     elif args.subcommand == 'destroy':
@@ -109,7 +116,15 @@ def execute_update(args):
 
 
 def execute_domain(args):
-    pass
+    env.hosts = args.host
+    if args.subcommand == 'list':
+        print(load_domain_list(args.name))
+    elif args.subcommand == 'set':
+        add_domain(args.name, args.domains)
+    elif args.subcommand == 'unset':
+        remove_domain(args.name, args.domains)
+    if args.domains:
+        config_nginx(args.name)
 
 
 def main():
@@ -136,6 +151,10 @@ def main():
     parser_config.set_defaults(func=execute_config)
 
     parser_domain = subparser.add_parser('domain', help='# Manage project domains')
+    parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
+    parser_config.add_argument('--domains', nargs='+', help='list of domains')
+    parser_config.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_config.add_argument('--name', help='project name', required=True)
     parser_domain.set_defaults(func=execute_domain)
 
     parser_service = subparser.add_parser('service', help='#  Manage services')
@@ -158,6 +177,7 @@ def main():
     parser_pg.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+', default='hotels')
     parser_pg.add_argument('--dump', help='dump file name [default=latest.dump]', default='latest.dump')
     parser_pg.set_defaults(func=execute_pg)
+
 
     args = parser.parse_args()
     args.func(args)
