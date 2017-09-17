@@ -29,6 +29,7 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
         'username': username,
     }
 
+    old_stdout = sys.stdout
     if not no_createdb:
         context.update({
             'db_username': id_generator(12),
@@ -93,6 +94,7 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
             env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         append('./{username}/.env'.format(username=username), env, use_sudo=True)
 
+        sys.stdout = old_stdout
         if exists('/home/{username}/{username}/requirements.txt'.format(username=username)) and not no_migrations:
             execute(run, username, 'python manage.py collectstatic --noinput')
             if should_sync:
