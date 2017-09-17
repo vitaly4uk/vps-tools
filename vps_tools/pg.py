@@ -1,15 +1,12 @@
 from __future__ import unicode_literals, print_function
 
 import dj_database_url
+import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import put
-import string
-import random
+
+from vps_tools.utils import StreamFilter
 from .config import load_environment_dict
-
-
-def id_generator(size=6, chars=string.ascii_lowercase):
-    return ''.join(random.choice(chars) for _ in range(size))
 
 
 @task
@@ -35,5 +32,6 @@ def restore(username, dump):
             sudo('dropdb {username}'.format(username=username))
             sudo('createdb {username}'.format(username=username))
         with hide('output'), settings(warn_only=True):
+            sys.stdout = StreamFilter([database['PASSWORD']], sys.stdout)
             sudo('PGPASSWORD={PASSWORD} pg_restore --verbose --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
     sudo('supervisorctl start {username}'.format(username=username))
