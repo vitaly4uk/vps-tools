@@ -34,5 +34,5 @@ def restore(username, dump):
             sudo('createdb {username}'.format(username=username))
         with hide('output'), settings(warn_only=True):
             sys.stdout = StreamFilter([database['PASSWORD']], sys.stdout)
-            sudo('PGPASSWORD={PASSWORD} pg_restore --verbose --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
+            sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
     sudo('supervisorctl start {username}'.format(username=username))
