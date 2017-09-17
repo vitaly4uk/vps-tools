@@ -5,8 +5,7 @@ import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import put
 
-from vps_tools.utils import StreamFilter
-from .config import load_environment_dict
+from vps_tools.utils import StreamFilter, load_environment_dict
 
 
 @task

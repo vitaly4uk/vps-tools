@@ -16,7 +16,7 @@ setup(
     author='Vitalii Omelchuk',
     author_email='vitaly.omelchuk@gmail.com',
     description='',
-    install_requires=['fabric', 'dj_database_url'],
+    install_requires=['fabric', 'dj_database_url', 'six'],
     entry_points={
         'console_scripts': ['hmara = vps_tools.hmara:main']
     }

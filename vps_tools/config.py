@@ -1,43 +1,25 @@
 from __future__ import unicode_literals, print_function
-from StringIO import StringIO
+
 import six
-from fabric.api import task, sudo, settings, cd, shell_env, get
-from fabric.contrib.files import put
+from fabric.api import task, sudo
 
-
-def load_environment_dict(username):
-    env_file = StringIO()
-    get('/home/{username}/{username}/.env'.format(username=username), env_file, use_sudo=True, temp_dir='/tmp')
-    env_lines = env_file.getvalue().split()
-    return dict((line.split('=')[0], line.split('=')[1]) for line in env_lines)
-
-
-def store_environment_dict(username, env_dict):
-    value = ''
-    for k, v in six.iteritems(env_dict):
-        value += '{}={}\n'.format(k, v)
-    env_file = StringIO(value)
-    put(env_file, '/tmp/.env')
-    home_folder = '/home/{username}'.format(username=username)
-    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
-        sudo('yes | cp /tmp/.env /home/{username}/{username}/.env'.format(username=username))
-        sudo('chmod 0600 /home/{username}/{username}/.env'.format(username=username))
+from vps_tools.utils import load_environment_dict, store_environment_dict, run_until_ok
 
 
 @task(default=True)
 def list(username):
     """
-    List environment variables of project. Usage: config.list:<username>
+    List environment variables of project. Usage: config list --name <username>
     """
     env_dict = load_environment_dict(username=username)
     for k, v in six.iteritems(env_dict):
         print('{}={}'.format(k, v))
 
 
-@task
-def set(username, **kwargs):
+@task()
+def set(username, kwargs):
     """
-    Set environment variable of project. Usage config.set:<username>[,<key>=<value>, ...]
+    Set environment variable of project. Usage config set --name <username> --vars [<key>=<value> ...]
     """
     env_dict = load_environment_dict(username=username)
     env_dict.update(kwargs)
@@ -45,4 +27,19 @@ def set(username, **kwargs):
         print('{}={}'.format(k, v))
     store_environment_dict(username=username, env_dict=env_dict)
     sudo('supervisorctl restart {}'.format(username))
-    sudo('supervisorctl status')
+    run_until_ok('supervisorctl status')
+
+
+@task()
+def unset(username, args):
+    """
+    Unset environment variable of project. Usage config unset --name <username> [<key> ...]
+    """
+    env_dict = load_environment_dict(username=username)
+    for key in args:
+        env_dict.pop(key, None)
+    for k, v in six.iteritems(env_dict):
+        print('{}={}'.format(k, v))
+    store_environment_dict(username=username, env_dict=env_dict)
+    sudo('supervisorctl restart {}'.format(username))
+    run_until_ok('supervisorctl status')

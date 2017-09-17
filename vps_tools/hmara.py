@@ -12,7 +12,7 @@ except ImportError:
     from ConfigParser import RawConfigParser
 
 from vps_tools.project import create, destroy, run, restart, list_projects, deploy
-from vps_tools.config import list, set
+from vps_tools.config import list, set, unset
 from vps_tools.service import nginx, postgresql
 from vps_tools.pg import dump, restore
 import logging
@@ -66,7 +66,9 @@ def execute_config(args):
         execute(list, args.name)
     elif args.subcommand == 'set':
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
-        execute(set, args.name, **kwars)
+        execute(set, args.name, kwars)
+    elif args.subcommand == 'unset':
+        execute(unset, args.name, args)
 
 
 def execute_service(args):
