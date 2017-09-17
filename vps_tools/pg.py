@@ -5,7 +5,7 @@ import sys
 from fabric.api import task, sudo, get, settings, shell_env, cd, hide
 from fabric.contrib.files import put
 
-from vps_tools.utils import StreamFilter, load_environment_dict
+from .utils import StreamFilter, load_environment_dict
 
 
 @task
@@ -29,7 +29,7 @@ def restore(username, dump):
         put(dump, '/tmp/latest.dump'.format(username=username))
         with settings(sudo_user='postgres'):
             sudo('dropdb {username}'.format(username=username))
-            sudo('createdb {username}'.format(username=username))
+            sudo('createdb {username} -O {db_username}'.format(username=username, db_username=database['USER']))
         with hide('output'), settings(warn_only=True), StreamFilter([database['PASSWORD']], sys.stdout):
             sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
     sudo('supervisorctl start {username}'.format(username=username))

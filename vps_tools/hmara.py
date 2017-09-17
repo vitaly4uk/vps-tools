@@ -3,7 +3,7 @@ import argparse
 import tempfile
 import os
 import sys
-import git
+import logging
 from fabric.api import execute, prompt, env, local
 
 try:
@@ -11,12 +11,11 @@ try:
 except ImportError:
     from ConfigParser import RawConfigParser
 
-from vps_tools.project import create, destroy, run, restart, list_projects, deploy
-from vps_tools.config import list as config_list, set, unset
-from vps_tools.service import nginx, postgresql
-from vps_tools.pg import dump, restore
-from vps_tools.domains import list as domain_list, set as domain_set, unset as domain_unset
-import logging
+from .project import create, destroy, run, restart, list_projects, deploy
+from .config import list as config_list, set, unset
+from .service import nginx, postgresql
+from .pg import dump, restore
+from .domains import list as domain_list, set as domain_set, unset as domain_unset
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -42,10 +41,15 @@ def execute_project(args):
     if args.subcommand == 'create':
         repo_url = args.repo_url
         if repo_url is None:
-            repo = git.Repo('.')
-            if repo.remotes.origin.url:
-                repo_url = repo.remotes.origin.url
+            try:
+                import git
+            except ImportError:
+                repo_url = ''
             else:
+                repo = git.Repo('.')
+                if repo.remotes.origin.url:
+                    repo_url = repo.remotes.origin.url
+            if not repo_url:
                 repo_url = prompt('Please, input repository url of project:')
         execute(create, args.name, repo_url=repo_url, no_createdb=args.no_createdb,
                 no_migrations=args.no_migrations, base_domain=args.base_domain)

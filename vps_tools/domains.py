@@ -1,13 +1,16 @@
 from __future__ import unicode_literals, print_function
 
 from fabric.decorators import task
+from fabric.utils import puts
+from fabric.colors import green
 
-from vps_tools.utils import load_domain_list, add_domain, remove_domain, config_nginx
+from .utils import load_domain_list, add_domain, remove_domain, config_nginx
 
 
 @task()
 def list(project_name):
-    print('\n'.join(load_domain_list(project_name)))
+    for d in load_domain_list(project_name):
+        puts(green(d))
 
 
 @task()

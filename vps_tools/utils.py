@@ -4,8 +4,6 @@ import string
 from StringIO import StringIO
 from time import sleep
 
-from collections import Iterable
-
 import sys
 from fabric.context_managers import settings, cd, shell_env
 from fabric.contrib.files import exists
@@ -14,7 +12,7 @@ import six
 
 __all__ = ['config_nginx', 'id_generator', 'add_domain', 'remove_domain', 'get_port_number', 'StreamFilter',
            'run_until_ok', 'load_environment_dict', 'store_environment_dict', 'create_home_folder',
-           'create_logs_folder']
+           'create_logs_folder', 'get_project_type']
 
 nginx_config = """server {{
     listen 80;
@@ -205,3 +203,34 @@ def remove_domain(project_name, domain):
         domain = [domain]
     domain_list = [d for d in domain_list if d not in domain]
     store_domain_list(project_name, domain_list)
+
+#######################
+
+
+def get_project_type(project_name):
+    home_folder = '/home/{username}'.format(username=project_name)
+    project_folder = '/home/{username}/{username}/'.format(username=project_name)
+    env_path = ''
+    if exists('{project_folder}/requirements.txt'.format(project_folder=project_folder)):
+        if not exists('{home_folder}/venv'.format(home_folder=home_folder)):
+            runtime_file = StringIO()
+            runtime = 'python-3.5'
+            if exists('{project_folder}/runtime.txt'.format(project_folder=project_folder)):
+                get('{project_folder}/runtime.txt'.format(project_folder=project_folder), runtime_file)
+                runtime = runtime_file.getvalue()[:10]
+            if runtime == 'python-2.7':
+                sudo('virtualenv venv')
+            elif runtime == 'python-3.5':
+                sudo('virtualenv venv --python=/usr/bin/python3.5')
+        sudo('{home_folder}/venv/bin/pip install -r {project_folder}/requirements.txt'.format(
+            project_folder=project_folder, home_folder=home_folder), pty=False)
+        env_path = '{home_folder}/venv/bin:'.format(home_folder=home_folder) + env_path
+    if exists('{project_folder}/package.json'.format(project_folder=project_folder)):
+        if exists('{project_folder}/yarn.lock'):
+            with cd(project_folder):
+                sudo('yarn install')
+        else:
+            with cd(project_folder):
+                sudo('npm install')
+        env_path = '{project_folder}/node_modules/.bin:'.format(project_folder=project_folder) + env_path
+    return env_path
