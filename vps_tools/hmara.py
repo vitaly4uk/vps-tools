@@ -6,17 +6,16 @@ import sys
 import git
 from fabric.api import execute, prompt, env, local
 
-from vps_tools.utils import load_domain_list, add_domain, remove_domain, config_nginx
-
 try:
     from configparser import RawConfigParser
 except ImportError:
     from ConfigParser import RawConfigParser
 
 from vps_tools.project import create, destroy, run, restart, list_projects, deploy
-from vps_tools.config import list, set, unset
+from vps_tools.config import list as config_list, set, unset
 from vps_tools.service import nginx, postgresql
 from vps_tools.pg import dump, restore
+from vps_tools.domains import list as domain_list, set as domain_set, unset as domain_unset
 import logging
 
 logging.basicConfig(level=logging.DEBUG,
@@ -69,7 +68,7 @@ def execute_project(args):
 def execute_config(args):
     env.hosts = args.host
     if args.subcommand == 'list':
-        execute(list, args.name)
+        execute(config_list, args.name)
     elif args.subcommand == 'set':
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, kwars)
@@ -118,13 +117,12 @@ def execute_update(args):
 def execute_domain(args):
     env.hosts = args.host
     if args.subcommand == 'list':
-        print(load_domain_list(args.name))
+        execute(domain_list, args.name)
     elif args.subcommand == 'set':
-        add_domain(args.name, args.domains)
+        execute(domain_set, args.name, args.domains)
     elif args.subcommand == 'unset':
-        remove_domain(args.name, args.domains)
-    if args.domains:
-        config_nginx(args.name)
+        execute(domain_unset, args.name, args.domains)
+
 
 
 def main():
