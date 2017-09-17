@@ -1,1 +1,1 @@
-VERSION="0.2.6a7"
+VERSION="0.2.6a8"
