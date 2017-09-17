@@ -17,6 +17,8 @@ __all__ = ['config_nginx', 'id_generator', 'add_domain', 'remove_domain', 'get_p
 nginx_config = """server {{
     listen 80;
     server_name {domain_list};
+    
+    {with_static}
 
     location / {{
         include /etc/nginx/proxy_params;
@@ -26,6 +28,15 @@ nginx_config = """server {{
     }}
 }}
 """
+
+nginx_config_static = """
+    location /static {{
+        gzip_static on;
+        root /home/{project_name}/{project_name};
+        add_header Cache-Control "public, max-age=31536000, immutable";            
+    }}
+"""
+
 supervisor_config = """[program:{project_name}]
 command=forego start
 autostart=true
@@ -35,7 +46,6 @@ stdout_logfile=/home/{project_name}/logs/stdout.log
 stderr_logfile=/home/{project_name}/logs/stderr.log
 user={project_name}
 directory=/home/{project_name}/{project_name}
-environment=PATH="{PATH}"
 """
 
 
@@ -62,8 +72,12 @@ def config_nginx(project_name):
     kwargs = {
         'domain_list': ' '.join(domain_list),
         'port': env_config['PORT'],
-        'project_name': project_name
+        'project_name': project_name,
+        'with_static': '',
     }
+    if exists('/home/{project_name}/{project_name}/static'.format(project_name=project_name)):
+        kwargs['with_static'] = nginx_config_static.format(project_name=project_name)
+
     nginx_content = nginx_config.format(**kwargs)
     put(local_path=StringIO(nginx_content),
         remote_path='/etc/nginx/sites-available/{project_name}'.format(project_name=project_name), use_sudo=True)
@@ -75,10 +89,8 @@ def config_nginx(project_name):
 
 
 def config_supervisor(project_name):
-    env_config = load_environment_dict(project_name)
     kwargs = {
         'project_name': project_name,
-        'PATH': env_config['PATH']
     }
     supervisor_content = supervisor_config.format(**kwargs)
     put(local_path=StringIO(supervisor_content),
