@@ -34,6 +34,6 @@ def restore(username, dump):
         with settings(sudo_user='postgres'):
             sudo('dropdb {username}'.format(username=username))
             sudo('createdb {username}'.format(username=username))
-        with hide('output'):
+        with hide('output'), settings(warn_only=True):
             sudo('PGPASSWORD={PASSWORD} pg_restore --verbose --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
     sudo('supervisorctl start {username}'.format(username=username))
