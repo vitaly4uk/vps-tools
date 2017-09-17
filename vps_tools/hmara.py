@@ -151,10 +151,10 @@ def main():
     parser_config.set_defaults(func=execute_config)
 
     parser_domain = subparser.add_parser('domain', help='# Manage project domains')
-    parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
-    parser_config.add_argument('--domains', nargs='+', help='list of domains')
-    parser_config.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
-    parser_config.add_argument('--name', help='project name', required=True)
+    parser_domain.add_argument('subcommand', choices=['list', 'set', 'unset'])
+    parser_domain.add_argument('--domains', nargs='+', help='list of domains')
+    parser_domain.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_domain.add_argument('--name', help='project name', required=True)
     parser_domain.set_defaults(func=execute_domain)
 
     parser_service = subparser.add_parser('service', help='#  Manage services')
