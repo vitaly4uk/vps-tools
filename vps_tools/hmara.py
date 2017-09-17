@@ -68,7 +68,7 @@ def execute_config(args):
         kwars = dict((i.split('=')[0], i.split('=')[1]) for i in args.vars)
         execute(set, args.name, kwars)
     elif args.subcommand == 'unset':
-        execute(unset, args.name, args)
+        execute(unset, args.name, args.vars)
 
 
 def execute_service(args):
