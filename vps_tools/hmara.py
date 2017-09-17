@@ -30,16 +30,11 @@ logging.getLogger('').addHandler(console)
 
 env.use_ssh_config = True
 
-env.hosts = ['hotels']
-
-SQS_URL = 'https://sqs.us-east-1.amazonaws.com/455994469874/hmara'
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def execute_project(args):
-    if args.host:
-        env.hosts = args.host
+    env.hosts = args.host
     if not args.subcommand == 'list' and args.name is None:
         print('--name is required')
         return
@@ -66,8 +61,7 @@ def execute_project(args):
 
 
 def execute_config(args):
-    if args.host:
-        env.hosts = args.host
+    env.hosts = args.host
     if args.subcommand == 'list':
         execute(list, args.name)
     elif args.subcommand == 'set':
@@ -89,12 +83,11 @@ def execute_service(args):
 
 def execute_pg(args):
     """Database commands."""
-    if args.host:
-        env.hosts = args.host
+    env.hosts = args.host
     if args.subcommand == 'dump':
-        execute(dump, args.name)
+        execute(dump, args.name, args.dump)
     elif args.subcommand == 'restore':
-        execute(restore, args.name)
+        execute(restore, args.name, args.dump)
 
 
 def execute_version(args):
@@ -127,17 +120,17 @@ def main():
     parser_project.add_argument('--name', help='project name')
     parser_project.add_argument('--repo-url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
-    parser_project.add_argument('--host', help='host name to run command on', nargs='+', default='hotels')
+    parser_project.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
     parser_project.add_argument('--no-createdb', help='do not create new database', action='store_true')
     parser_project.add_argument('--no-migrations', help='do not apply migrations', action='store_true')
-    parser_project.add_argument('--base-domain', help='base domain.', default='nomax.com.ua')
+    parser_project.add_argument('--base-domain', help='base domain. [default=nomax.com.ua]', default='nomax.com.ua')
     parser_project.set_defaults(func=execute_project)
 
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')
     parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
     parser_config.add_argument('--vars', nargs='+', help='<key>=<value> pairs of vars')
-    parser_config.add_argument('--host', help='host name to run command on', nargs='+')
-    parser_config.add_argument('name')
+    parser_config.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_config.add_argument('--name', help='project name', required=True)
     parser_config.set_defaults(func=execute_config)
 
     parser_domain = subparser.add_parser('domain', help='# Manage project domains')
@@ -148,7 +141,7 @@ def main():
     parser_service.add_argument('service_command',
                                 choices=['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest',
                                          'rotate', 'upgrade'])
-    parser_service.add_argument('--host', help='host name to run command on', nargs='+')
+    parser_service.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+', default='hotels')
     parser_service.set_defaults(func=execute_service)
 
     parser_version = subparser.add_parser('version', help='#  Print hmara version')
@@ -159,8 +152,9 @@ def main():
 
     parser_pg = subparser.add_parser('pg', help='#  Manage database')
     parser_pg.add_argument('subcommand', choices=['dump', 'restore'])
-    parser_pg.add_argument('name', help='project name')
-    parser_pg.add_argument('--host', help='host name to run command on', nargs='+')
+    parser_pg.add_argument('--name', help='project name', required=True)
+    parser_pg.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+', default='hotels')
+    parser_pg.add_argument('--dump', help='dump file name [default=latest.dump]', default='latest.dump')
     parser_pg.set_defaults(func=execute_pg)
 
     args = parser.parse_args()

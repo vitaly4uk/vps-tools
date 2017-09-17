@@ -226,6 +226,7 @@ def restart(username):
     Restart project. Usage: project.restart:<username>
     """
     sudo('supervisorctl restart {username}'.format(username=username))
+    run_until_ok('supervisorctl status')
 
 
 @task
