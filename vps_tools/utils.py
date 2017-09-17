@@ -172,16 +172,16 @@ def store_domain_list(project_name, domain_list):
 
 def add_domain(project_name, domain):
     domain_list = load_domain_list(project_name)
-    if isinstance(domain, Iterable):
-        domain_list = domain_list + domain
-    else:
+    if isinstance(domain, six.string_types):
         domain_list.append(domain)
+    else:
+        domain_list = domain_list + domain
     store_domain_list(project_name, domain_list)
 
 
 def remove_domain(project_name, domain):
     domain_list = load_domain_list(project_name)
-    if not isinstance(domain, Iterable):
+    if isinstance(domain, six.string_types):
         domain = [domain]
     domain_list = [d for d in domain_list if d not in domain]
     store_domain_list(project_name, domain_list)
