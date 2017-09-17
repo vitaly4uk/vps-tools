@@ -12,24 +12,24 @@ from vps_tools.config import set as config_set
 
 
 @task()
-def create(username, repo_url, no_createdb, no_migrations, base_domain):
+def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
     """
     Create new project. Usage project.create:<username>,repo_url=<github_url>
     """
-    home_folder = '/home/{username}'.format(username=username)
-    domain_name = '{project_name}.{base_domain}'.format(project_name=username, base_domain=base_domain)
+    home_folder = '/home/{username}'.format(username=project_name)
+    domain_name = '{project_name}.{base_domain}'.format(project_name=project_name, base_domain=base_domain)
 
     db_kwargs = {
         'db_username': id_generator(12),
         'db_password': id_generator(12),
-        'username': username
+        'username': project_name
     }
 
     env = ['PORT={port_number}'.format(port_number=get_port_number())]
 
-    create_home_folder(project_name=username)
-    create_logs_folder(project_name=username)
-    add_domain(project_name=username, domain=domain_name)
+    create_home_folder(project_name=project_name)
+    create_logs_folder(project_name=project_name)
+    add_domain(project_name=project_name, domain=domain_name)
 
     if not no_createdb:
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**db_kwargs)
@@ -38,16 +38,16 @@ def create(username, repo_url, no_createdb, no_migrations, base_domain):
             sudo('psql -c "create user {db_username} with password \'{db_password}\'"'.format(**db_kwargs))
             sudo('createdb {username} -O {db_username}'.format(**db_kwargs))
 
-    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
-        if not exists('./{username}'.format(username=username), use_sudo=True):
-            sudo('git clone -q {repo_url} {username}'.format(username=username, repo_url=repo_url))
+    with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
+        if not exists('./{username}'.format(username=project_name), use_sudo=True):
+            sudo('git clone -q {repo_url} {username}'.format(username=project_name, repo_url=repo_url))
 
     with StreamFilter([db_kwargs['db_password']], sys.stdout):
-        append('./{username}/.env'.format(username=username), env, use_sudo=True)
+        append('/{username}/{username}/.env'.format(username=project_name), env, use_sudo=True)
 
-    config_supervisor(project_name=username)
-    execute(deploy, username)
-    config_nginx(project_name=username)
+    config_supervisor(project_name=project_name)
+    execute(deploy, project_name)
+    config_nginx(project_name=project_name)
 
 
 @task()
@@ -100,6 +100,8 @@ def deploy(project_name):
                 elif runtime == 'python-3.5':
                     sudo('virtualenv venv --python=/usr/bin/python3.5')
             sudo('./venv/bin/pip install -r {project_folder}/requirements.txt'.format(project_folder=project_folder), pty=False)
+            env_path = '{home_folder}/venv/bin:'.format(home_folder=home_folder) + env_path
+            execute(config_set, project_name, {'PATH': env_path}, do_reload=False)
             execute(run, project_name, 'python manage.py collectstatic --noinput')
             should_sync = False
             has_south = False
@@ -119,7 +121,6 @@ def deploy(project_name):
                 execute(run, project_name, 'python manage.py syncdb --noinput')
             if has_south or not should_sync:
                 execute(run, project_name, 'python manage.py migrate --noinput')
-            env_path = '{home_folder}/venv/bin:'.format(home_folder=home_folder) + env_path
         if exists('{project_folder}/package.json'.format(project_folder=project_folder)):
             if exists('{project_folder}/yarn.lock'):
                 with cd(project_folder):
@@ -128,7 +129,7 @@ def deploy(project_name):
                 with cd(project_folder):
                     sudo('npm install')
             env_path = '{project_folder}/node_modules/.bin:'.format(project_folder=project_folder) + env_path
-    execute(config_set, project_name, {'PATH': env_path})
+            execute(config_set, project_name, {'PATH': env_path}, do_reload=False)
 
 
 @task()

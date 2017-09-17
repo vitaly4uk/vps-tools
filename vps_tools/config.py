@@ -17,7 +17,7 @@ def list(username):
 
 
 @task()
-def set(username, kwargs):
+def set(username, kwargs, do_reload=True):
     """
     Set environment variable of project. Usage config set --name <username> --vars [<key>=<value> ...]
     """
@@ -26,12 +26,13 @@ def set(username, kwargs):
     for k, v in six.iteritems(env_dict):
         print('{}={}'.format(k, v))
     store_environment_dict(username=username, env_dict=env_dict)
-    sudo('supervisorctl restart {}'.format(username))
-    run_until_ok('supervisorctl status')
+    if do_reload:
+        sudo('supervisorctl restart {}'.format(username))
+        run_until_ok('supervisorctl status')
 
 
 @task()
-def unset(username, args):
+def unset(username, args, do_reload=True):
     """
     Unset environment variable of project. Usage config unset --name <username> [<key> ...]
     """
@@ -41,5 +42,6 @@ def unset(username, args):
     for k, v in six.iteritems(env_dict):
         print('{}={}'.format(k, v))
     store_environment_dict(username=username, env_dict=env_dict)
-    sudo('supervisorctl restart {}'.format(username))
-    run_until_ok('supervisorctl status')
+    if do_reload:
+        sudo('supervisorctl restart {}'.format(username))
+        run_until_ok('supervisorctl status')
