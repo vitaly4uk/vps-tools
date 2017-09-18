@@ -9,27 +9,27 @@ from .utils import StreamFilter, load_environment_dict
 
 
 @task
-def dump(username, dump):
-    remote_env = load_environment_dict(username)
+def dump(project_name, dump):
+    remote_env = load_environment_dict(project_name)
     database = dj_database_url.parse(remote_env['DATABASE_URL'])
-    home_folder = '/home/{username}'.format(username=username)
-    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder), hide('output'):
+    home_folder = '/home/{project_name}'.format(project_name=project_name)
+    with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder), hide('output'):
         with StreamFilter([database['PASSWORD']], sys.stdout):
-            sudo('PGPASSWORD={PASSWORD} pg_dump -Fc --no-acl --no-owner -h localhost -U {USER} {NAME} > latest.dump'.format(**database))
+            sudo('PGPASSWORD={PASSWORD} pg_dump -Fc --no-acl --no-owner -h {HOST} -p {PORT} -U {USER} {NAME} > latest.dump'.format(**database))
         get('latest.dump', dump, temp_dir='/tmp')
 
 
 @task
-def restore(username, dump):
-    remote_env = load_environment_dict(username)
+def restore(project_name, dump):
+    remote_env = load_environment_dict(project_name)
     database = dj_database_url.parse(remote_env['DATABASE_URL'])
-    home_folder = '/home/{username}'.format(username=username)
-    sudo('supervisorctl stop {username}'.format(username=username))
-    with cd(home_folder), settings(sudo_user=username), shell_env(HOME=home_folder):
-        put(dump, '/tmp/latest.dump'.format(username=username))
+    home_folder = '/home/{project_name}'.format(project_name=project_name)
+    sudo('supervisorctl stop {project_name}'.format(project_name=project_name))
+    with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
+        put(dump, '/tmp/{project_name}.dump'.format(project_name=project_name))
         with settings(sudo_user='postgres'):
-            sudo('dropdb {username}'.format(username=username))
-            sudo('createdb {username} -O {db_username}'.format(username=username, db_username=database['USER']))
+            sudo('dropdb --if-exists -h {HOST} -p {PORT} {NAME}'.format(**database))
+            sudo('createdb {NAME} -O {USER} -h {HOST} -p {PORT}'.format(**database))
         with hide('output'), settings(warn_only=True), StreamFilter([database['PASSWORD']], sys.stdout):
-            sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -h localhost -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
-    sudo('supervisorctl start {username}'.format(username=username))
+            sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -h {HOST} -p {PORT} -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
+    sudo('supervisorctl start {project_name}'.format(project_name=project_name))

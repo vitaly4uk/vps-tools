@@ -8,8 +8,10 @@ from fabric.contrib.files import exists, append
 from fabric.utils import puts
 from fabric.colors import green
 
+import dj_database_url
+
 from .utils import id_generator, run_until_ok, get_port_number, StreamFilter, add_domain, config_nginx, \
-    config_supervisor, create_home_folder, create_logs_folder
+    config_supervisor, create_home_folder, create_logs_folder, load_environment_dict
 
 
 @task()
@@ -42,8 +44,9 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**db_kwargs)
         env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         with settings(sudo_user='postgres'), StreamFilter([db_kwargs['db_password']], sys.stdout):
-            sudo('psql -c "create user {db_username} with password \'{db_password}\'"'.format(**db_kwargs))
-            sudo('createdb {username} -O {db_username}'.format(**db_kwargs))
+            database = dj_database_url.parse(db_url)
+            sudo('psql  -h {HOST} -p {PORT} -c "create user {USER} with password \'{PASSWORD}\'"'.format(**database))
+            sudo('createdb {NAME} -O {USER} -h {HOST} -p {PORT}'.format(**database))
 
     with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
         if not exists(project_folder):
@@ -67,10 +70,10 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
     if exists('{project_folder}/package.json'.format(project_folder=project_folder)):
         if exists('{project_folder}/yarn.lock'):
             with cd(project_folder):
-                sudo('yarn install')
+                sudo('yarn install && yarn build')
         else:
             with cd(project_folder):
-                sudo('npm install')
+                sudo('npm install && npm build')
         env_path = '{project_folder}/node_modules/.bin:'.format(project_folder=project_folder) + env_path
 
     with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
@@ -104,32 +107,38 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
 
 
 @task()
-def destroy(username):
+def destroy(project_name):
     """
-    Destroy project. Delete all data and config files. Usage: project.destroy:<username>
+    Destroy project. Delete all data and config files. Usage: project destroy --name <project_name>
     """
-    supervisor_file_name = '/etc/supervisor/conf.d/{username}.conf'.format(username=username)
-    nginx_file_name = '/etc/nginx/sites-enabled/{username}'.format(username=username)
+    supervisor_file_name = '/etc/supervisor/conf.d/{}.conf'.format(project_name)
+    nginx_file_name = '/etc/nginx/sites-enabled/{}'.format(project_name)
     if exists(nginx_file_name):
         sudo('rm -rf {}'.format(nginx_file_name))
         sudo('service nginx reload')
         run_until_ok('service nginx status')
     if exists(supervisor_file_name):
-        sudo('supervisorctl stop {username}'.format(username=username))
-        sudo('rm {supervisor_file_name}'.format(supervisor_file_name=supervisor_file_name))
+        sudo('supervisorctl stop {}'.format(project_name))
+        sudo('rm {}'.format(supervisor_file_name))
         sudo('supervisorctl reload')
         run_until_ok('supervisorctl status')
 
-    if exists('/var/log/{username}'.format(username=username)):
-        sudo('rm -rf /var/log/{username}'.format(username=username))
+    log_file_path = '/var/log/{}'.format(project_name)
+    if exists(log_file_path):
+        sudo('rm -rf {}'.format(log_file_path))
 
+    remote_env = load_environment_dict(project_name)
+    database = dj_database_url.parse(remote_env['DATABASE_URL'])
     with settings(sudo_user='postgres'):
-        sudo('dropdb --if-exists {username}'.format(username=username))
-    sudo('deluser --remove-home {}'.format(username))
+        sudo('dropdb --if-exists -h {HOST} -p {PORT} {NAME}'.format(**database))
+    sudo('deluser --remove-home {}'.format(project_name))
 
 
 @task()
 def deploy(project_name):
+    """
+    Deploy project
+    """
     home_folder = '/home/{username}'.format(username=project_name)
     project_folder = '/home/{username}/{username}/'.format(username=project_name)
     with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
@@ -150,7 +159,7 @@ def deploy(project_name):
 @task()
 def run(username, cmd):
     """
-    Run command on project environment. Usage: project.run:<username>,cmd='<command>'
+    Run command on project environment. Usage: project run --name <project_name> --cmd <command>
     """
     home_folder = '/home/{username}'.format(username=username)
     project_folder = '/home/{username}/{username}'.format(username=username)
@@ -161,7 +170,7 @@ def run(username, cmd):
 @task()
 def restart(project_name):
     """
-    Restart project. Usage: project.restart:<username>
+    Restart project. Usage: project restart --name <project_name>
     """
     sudo('supervisorctl restart {project_name}'.format(project_name=project_name))
     run_until_ok('supervisorctl status')
