@@ -5,6 +5,8 @@ import os
 import sys
 import logging
 from fabric.api import execute, prompt, env, local
+from fabric.utils import puts
+from fabric.colors import green
 
 try:
     from configparser import RawConfigParser
@@ -108,12 +110,12 @@ def execute_version(args):
     """
     with open(os.path.join(BASE_DIR, '__init__.py'), 'r') as version_file:
         _, version = version_file.read().split("=")
-    print('hmara version: {}'.format(version[1:-1]))
+    puts(green('hmara version: {}'.format(version[1:-1])))
 
 
 def execute_update(args):
     if sys.platform == 'win32':
-        print('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+        puts(green('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip'))
     else:
         local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
 
