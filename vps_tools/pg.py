@@ -15,7 +15,7 @@ def dump(project_name, dump):
     home_folder = '/home/{project_name}'.format(project_name=project_name)
     with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder), hide('output'):
         with StreamFilter([database['PASSWORD']], sys.stdout):
-            sudo('PGPASSWORD={PASSWORD} pg_dump -Fc --no-acl --no-owner -h {HOST} -p {PORT} -U {USER} {NAME} > latest.dump'.format(**database))
+            sudo('PGPASSWORD={PASSWORD} pg_dump -Fc --no-acl --no-owner {NAME} > latest.dump'.format(**database))
         get('latest.dump', dump, temp_dir='/tmp')
 
 
@@ -31,5 +31,5 @@ def restore(project_name, dump):
             sudo('dropdb --if-exists -h {HOST} -p {PORT} {NAME}'.format(**database))
             sudo('createdb {NAME} -O {USER} -h {HOST} -p {PORT}'.format(**database))
         with hide('output'), settings(warn_only=True), StreamFilter([database['PASSWORD']], sys.stdout):
-            sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -h {HOST} -p {PORT} -U {USER} -d {NAME} /tmp/latest.dump'.format(**database))
+            sudo('PGPASSWORD={PASSWORD} pg_restore --clean --no-acl --no-owner -d {NAME} /tmp/latest.dump'.format(**database))
     sudo('supervisorctl start {project_name}'.format(project_name=project_name))

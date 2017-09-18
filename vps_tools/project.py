@@ -8,10 +8,8 @@ from fabric.contrib.files import exists, append
 from fabric.utils import puts
 from fabric.colors import green
 
-import dj_database_url
-
 from .utils import id_generator, run_until_ok, get_port_number, StreamFilter, add_domain, config_nginx, \
-    config_supervisor, create_home_folder, create_logs_folder, load_environment_dict
+    config_supervisor, create_home_folder, create_logs_folder
 
 
 @task()
@@ -44,9 +42,8 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
         db_url = 'postgres://{db_username}:{db_password}@localhost:5432/{username}'.format(**db_kwargs)
         env.append('DATABASE_URL={db_url}'.format(db_url=db_url))
         with settings(sudo_user='postgres'), StreamFilter([db_kwargs['db_password']], sys.stdout):
-            database = dj_database_url.parse(db_url)
-            sudo('psql  -h {HOST} -p {PORT} -c "create user {USER} with password \'{PASSWORD}\'"'.format(**database))
-            sudo('createdb {NAME} -O {USER} -h {HOST} -p {PORT}'.format(**database))
+            sudo('psql -c "create user {db_username} with password \'{db_password}\'"'.format(**db_kwargs))
+            sudo('createdb {username} -O {db_username}'.format(**db_kwargs))
 
     with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
         if not exists(project_folder):
@@ -127,10 +124,8 @@ def destroy(project_name):
     if exists(log_file_path):
         sudo('rm -rf {}'.format(log_file_path))
 
-    remote_env = load_environment_dict(project_name)
-    database = dj_database_url.parse(remote_env['DATABASE_URL'])
     with settings(sudo_user='postgres'):
-        sudo('dropdb --if-exists -h {HOST} -p {PORT} {NAME}'.format(**database))
+        sudo('dropdb --if-exists {}'.format(project_name))
     sudo('deluser --remove-home {}'.format(project_name))
 
 
