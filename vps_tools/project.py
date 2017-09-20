@@ -149,6 +149,7 @@ def deploy(project_name):
             else:
                 with cd(project_folder):
                     sudo('npm build')
+    execute(restart, project_name)
 
 
 @task()
