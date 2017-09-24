@@ -1,4 +1,5 @@
 from __future__ import unicode_literals, print_function
+from colorama import init
 import argparse
 import tempfile
 import os
@@ -18,6 +19,8 @@ from .config import list as config_list, set, unset
 from .service import nginx, postgresql
 from .pg import dump, restore
 from .domains import list as domain_list, set as domain_set, unset as domain_unset
+
+init()
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
