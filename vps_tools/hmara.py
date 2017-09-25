@@ -1,5 +1,6 @@
 from __future__ import unicode_literals, print_function
 from colorama import init
+from urlparse import urlparse
 import argparse
 import tempfile
 import os
@@ -7,7 +8,9 @@ import sys
 import logging
 from fabric.api import execute, prompt, env, local
 from fabric.utils import puts
-from fabric.colors import green
+from fabric.colors import green, red
+from storm import Storm
+from storm.parsers.ssh_uri_parser import parse
 
 try:
     from configparser import RawConfigParser
@@ -41,7 +44,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def execute_project(args):
     env.hosts = args.host
     if not args.subcommand == 'list' and args.name is None:
-        print('--name is required')
+        puts(red('--name is required'))
         return
     if args.subcommand == 'create':
         repo_url = args.repo_url
@@ -107,6 +110,26 @@ def execute_pg(args):
         execute(restore, args.name, args.dump)
 
 
+def execute_host(args):
+    if not args.subcommand == 'list' and not args.host:
+        puts(red('--host is required'))
+        return
+    ssh_config = Storm()
+    if args.subcommand == 'list':
+        for entry in ssh_config.list_entries():
+            puts(green(entry['host']))
+    elif args.subcommand == 'add':
+        result = parse(args.connection_url)
+        puts(result)
+        ssh_config.add_entry(args.host, host=result[1], user=result[0], port=result[2], id_file=args.id_file)
+        for entry in ssh_config.list_entries():
+            puts(green(entry['host']))
+    elif args.subcommand == 'delete':
+        ssh_config.delete_entry(args.host)
+        for entry in ssh_config.list_entries():
+            puts(green(entry['host']))
+
+
 def execute_version(args):
     """
     Show version
@@ -118,9 +141,9 @@ def execute_version(args):
 
 def execute_update(args):
     if sys.platform == 'win32':
-        puts(green('pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip'))
+        puts(green('pip install --upgrade https://git.vomelchuk.com/vitaly4uk/vps-tools/archive/master.zip'))
     else:
-        local('sudo -H pip install --upgrade https://github.com/vitaly4uk/vps-tools/archive/master.zip')
+        local('sudo -H pip install --upgrade https://git.vomelchuk.com/vitaly4uk/vps-tools/archive/master.zip')
 
 
 def execute_domain(args):
@@ -133,7 +156,6 @@ def execute_domain(args):
         execute(domain_unset, args.name, args.domains)
 
 
-
 def main():
     parser = argparse.ArgumentParser(description='Configure projects on hmara servers.')
 
@@ -144,7 +166,8 @@ def main():
     parser_project.add_argument('--name', help='project name')
     parser_project.add_argument('--repo-url', help='git repository url with project')
     parser_project.add_argument('--cmd', help='', nargs=argparse.REMAINDER)
-    parser_project.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_project.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+',
+                                default='hotels')
     parser_project.add_argument('--no-createdb', help='do not create new database', action='store_true')
     parser_project.add_argument('--no-migrations', help='do not apply migrations', action='store_true')
     parser_project.add_argument('--base-domain', help='base domain. [default=nomax.com.ua]', default='nomax.com.ua')
@@ -153,14 +176,16 @@ def main():
     parser_config = subparser.add_parser('config', help='#  Manage projects config vars')
     parser_config.add_argument('subcommand', choices=['list', 'set', 'unset'])
     parser_config.add_argument('--vars', nargs='+', help='<key>=<value> pairs of vars')
-    parser_config.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_config.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+',
+                               default='hotels')
     parser_config.add_argument('--name', help='project name', required=True)
     parser_config.set_defaults(func=execute_config)
 
     parser_domain = subparser.add_parser('domain', help='# Manage project domains')
     parser_domain.add_argument('subcommand', choices=['list', 'set', 'unset'])
     parser_domain.add_argument('--domains', nargs='+', help='list of domains')
-    parser_domain.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+', default='hotels')
+    parser_domain.add_argument('--host', help='host name to run command on [default=hotels]', nargs='+',
+                               default='hotels')
     parser_domain.add_argument('--name', help='project name', required=True)
     parser_domain.set_defaults(func=execute_domain)
 
@@ -169,8 +194,16 @@ def main():
     parser_service.add_argument('service_command',
                                 choices=['start', 'stop', 'restart', 'reload', 'force-reload', 'status', 'configtest',
                                          'rotate', 'upgrade'])
-    parser_service.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+', default='hotels')
+    parser_service.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+',
+                                default='hotels')
     parser_service.set_defaults(func=execute_service)
+
+    parser_host = subparser.add_parser('host', help='#  Manage hosts')
+    parser_host.add_argument('subcommand', choices=['list', 'add', 'delete'])
+    parser_host.add_argument('--host', help='host name to run command on')
+    parser_host.add_argument('--connection-url', help='ssh connection uri')
+    parser_host.add_argument('--id-file', help='identification file path')
+    parser_host.set_defaults(func=execute_host)
 
     parser_version = subparser.add_parser('version', help='#  Print hmara version')
     parser_version.set_defaults(func=execute_version)
@@ -184,7 +217,6 @@ def main():
     parser_pg.add_argument('--host', help='host name to run command on  [default=hotels]', nargs='+', default='hotels')
     parser_pg.add_argument('--dump', help='dump file name [default=latest.dump]', default='latest.dump')
     parser_pg.set_defaults(func=execute_pg)
-
 
     args = parser.parse_args()
     args.func(args)
