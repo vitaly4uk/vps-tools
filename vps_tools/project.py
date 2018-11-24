@@ -52,15 +52,15 @@ def create(project_name, repo_url, no_createdb, no_migrations, base_domain):
     if exists('{project_folder}/requirements.txt'.format(project_folder=project_folder)):
         if not exists('{home_folder}/venv'.format(home_folder=home_folder)):
             runtime_file = StringIO()
-            runtime = 'python-3.5'
+            runtime = 'python-3'
             if exists('{project_folder}/runtime.txt'.format(project_folder=project_folder)):
                 get('{project_folder}/runtime.txt'.format(project_folder=project_folder), runtime_file)
-                runtime = runtime_file.getvalue()[:10]
+                runtime = runtime_file.getvalue()[:8]
             with cd(home_folder), settings(sudo_user=project_name), shell_env(HOME=home_folder):
-                if runtime == 'python-2.7':
-                    sudo('virtualenv venv')
-                elif runtime == 'python-3.5':
-                    sudo('virtualenv venv --python=/usr/bin/python3.5')
+                if runtime == 'python-2':
+                    sudo('virtualenv venv --python=/usr/bin/python2')
+                elif runtime == 'python-3':
+                    sudo('virtualenv venv --python=/usr/bin/python3')
         sudo('{home_folder}/venv/bin/pip install -r {project_folder}/requirements.txt'.format(
             project_folder=project_folder, home_folder=home_folder), pty=False)
         env_path = '{home_folder}/venv/bin:'.format(home_folder=home_folder) + env_path
