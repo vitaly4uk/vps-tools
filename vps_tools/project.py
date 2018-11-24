@@ -126,6 +126,7 @@ def destroy(project_name):
 
     with settings(sudo_user='postgres'):
         sudo('dropdb --if-exists {}'.format(project_name))
+        sudo('dropuser --if-exists {}'.format(project_name))
     sudo('deluser --remove-home {}'.format(project_name))
 
 
